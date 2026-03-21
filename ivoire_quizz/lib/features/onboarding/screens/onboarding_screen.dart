@@ -194,14 +194,17 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                 .fadeIn(delay: 200.ms, duration: 400.ms)
                 .slideY(begin: 0.2, end: 0, delay: 200.ms, duration: 400.ms),
             const SizedBox(height: 12),
-            Text(
-              '10 questions par session — Histoire, Géographie, Gastronomie. Réponds vite pour gagner plus de points !',
-              textAlign: TextAlign.center,
-              style: GoogleFonts.nunito(
-                fontSize: 15,
-                fontWeight: FontWeight.w400,
-                color: _textGray,
-                height: 1.45,
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 8),
+              child: Text(
+                '10 questions par session — Histoire, Géographie, Gastronomie. Réponds vite pour gagner plus de points !',
+                textAlign: TextAlign.center,
+                style: GoogleFonts.nunito(
+                  fontSize: 15,
+                  fontWeight: FontWeight.w400,
+                  color: _textGray,
+                  height: 1.45,
+                ),
               ),
             ).animate().fadeIn(delay: 300.ms, duration: 400.ms),
             const SizedBox(height: 24),
@@ -255,14 +258,17 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                 .fadeIn(delay: 200.ms, duration: 400.ms)
                 .slideY(begin: 0.2, end: 0, delay: 200.ms, duration: 400.ms),
             const SizedBox(height: 12),
-            Text(
-              'Ajoute tes amis via leur code unique et monte dans le classement ivoirien !',
-              textAlign: TextAlign.center,
-              style: GoogleFonts.nunito(
-                fontSize: 15,
-                fontWeight: FontWeight.w400,
-                color: _textGray,
-                height: 1.45,
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 8),
+              child: Text(
+                'Ajoute tes amis via leur code unique et monte dans le classement ivoirien !',
+                textAlign: TextAlign.center,
+                style: GoogleFonts.nunito(
+                  fontSize: 15,
+                  fontWeight: FontWeight.w400,
+                  color: _textGray,
+                  height: 1.45,
+                ),
               ),
             ).animate().fadeIn(delay: 300.ms, duration: 400.ms),
           ],
@@ -556,7 +562,7 @@ class _KentePatternPainter extends CustomPainter {
     const spacing = 8.0;
     const step = diamondSize + spacing;
 
-    final paint = Paint()..color = _patternColor.withValues(alpha: 0.04);
+    final paint = Paint()..color = _patternColor.withOpacity(0.04);
 
     for (double y = -step; y <= size.height + step; y += step) {
       for (double x = -step; x <= size.width + step; x += step) {
