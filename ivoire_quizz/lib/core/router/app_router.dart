@@ -4,7 +4,14 @@ import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 
+import '../../features/auth/screens/auth_screen.dart';
+import '../../features/friends/screens/friends_screen.dart';
+import '../../features/home/screens/home_screen.dart';
+import '../../features/leaderboard/screens/leaderboard_screen.dart';
 import '../../features/onboarding/screens/onboarding_screen.dart';
+import '../../features/profile/screens/profile_screen.dart';
+import '../../features/quiz/screens/quiz_screen.dart';
+import '../../features/quiz/screens/result_screen.dart';
 import '../theme/app_theme.dart';
 
 final Provider<GoRouter> routerProvider = Provider<GoRouter>((Ref ref) {
@@ -171,12 +178,16 @@ class MainScreen extends StatelessWidget {
           switch (index) {
             case 0:
               context.go('/home');
+              return;
             case 1:
               context.go('/leaderboard');
+              return;
             case 2:
               context.go('/friends');
+              return;
             case 3:
               context.go('/profile');
+              return;
           }
         },
         destinations: const <NavigationDestination>[
@@ -200,83 +211,5 @@ class MainScreen extends StatelessWidget {
       return 3;
     }
     return 0;
-  }
-}
-
-class AuthScreen extends StatelessWidget {
-  const AuthScreen({super.key});
-
-  @override
-  Widget build(BuildContext context) {
-    return const Scaffold(body: Center(child: Text('Auth')));
-  }
-}
-
-class HomeScreen extends StatelessWidget {
-  const HomeScreen({super.key});
-
-  @override
-  Widget build(BuildContext context) {
-    return const Scaffold(body: Center(child: Text('Home')));
-  }
-}
-
-class LeaderboardScreen extends StatelessWidget {
-  const LeaderboardScreen({super.key});
-
-  @override
-  Widget build(BuildContext context) {
-    return const Scaffold(body: Center(child: Text('Leaderboard')));
-  }
-}
-
-class FriendsScreen extends StatelessWidget {
-  const FriendsScreen({super.key});
-
-  @override
-  Widget build(BuildContext context) {
-    return const Scaffold(body: Center(child: Text('Friends')));
-  }
-}
-
-class ProfileScreen extends StatelessWidget {
-  const ProfileScreen({super.key});
-
-  @override
-  Widget build(BuildContext context) {
-    return const Scaffold(body: Center(child: Text('Profile')));
-  }
-}
-
-class QuizScreen extends StatelessWidget {
-  const QuizScreen({required this.categoryId, required this.mode, super.key});
-
-  final int? categoryId;
-  final String mode;
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(title: const Text('Quiz')),
-      body: Center(
-        child: Text('categoryId: $categoryId | mode: $mode'),
-      ),
-    );
-  }
-}
-
-class ResultScreen extends StatelessWidget {
-  const ResultScreen({required this.resultData, super.key});
-
-  final Map<String, dynamic> resultData;
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(title: const Text('Résultat')),
-      body: Center(
-        child: Text('Résultat: $resultData'),
-      ),
-    );
   }
 }
