@@ -4,6 +4,7 @@ import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 
+import '../../features/onboarding/screens/onboarding_screen.dart';
 import '../theme/app_theme.dart';
 
 final Provider<GoRouter> routerProvider = Provider<GoRouter>((Ref ref) {
@@ -199,15 +200,6 @@ class MainScreen extends StatelessWidget {
       return 3;
     }
     return 0;
-  }
-}
-
-class OnboardingScreen extends StatelessWidget {
-  const OnboardingScreen({super.key});
-
-  @override
-  Widget build(BuildContext context) {
-    return const Scaffold(body: Center(child: Text('Onboarding')));
   }
 }
 
