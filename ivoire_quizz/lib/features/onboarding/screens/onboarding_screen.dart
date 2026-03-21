@@ -93,187 +93,194 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
   }
 
   Widget _buildSlide1() {
-    return SingleChildScrollView(
-      padding: const EdgeInsets.symmetric(horizontal: 24),
-      child: SizedBox(
-        height: 520,
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            _buildMascotAsset('assets/images/kwame_welcome.png', height: 220)
-                .animate()
-                .fadeIn(duration: 600.ms)
-                .slideY(begin: 0.3, end: 0, duration: 600.ms),
-            const SizedBox(height: 32),
-            Text(
-              'Bienvenue sur IvoireQuiz !',
+    return _buildSlideLayout(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          _buildMascotAsset('assets/images/kwame_welcome.png', height: 220)
+              .animate()
+              .fadeIn(duration: 600.ms)
+              .slideY(begin: 0.3, end: 0, duration: 600.ms),
+          const SizedBox(height: 32),
+          Text(
+            'Bienvenue sur IvoireQuiz !',
+            textAlign: TextAlign.center,
+            style: GoogleFonts.nunito(
+              fontSize: 26,
+              fontWeight: FontWeight.w800,
+              color: _textDark,
+            ),
+          )
+              .animate()
+              .fadeIn(delay: 200.ms, duration: 400.ms)
+              .slideY(begin: 0.2, end: 0, delay: 200.ms, duration: 400.ms),
+          const SizedBox(height: 12),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 8),
+            child: Text(
+              'Le quiz qui célèbre la culture et l\'histoire de la Côte d\'Ivoire',
               textAlign: TextAlign.center,
               style: GoogleFonts.nunito(
-                fontSize: 26,
-                fontWeight: FontWeight.w800,
-                color: _textDark,
+                fontSize: 15,
+                fontWeight: FontWeight.w400,
+                color: _textGray,
+                height: 1.45,
               ),
-            )
-                .animate()
-                .fadeIn(delay: 200.ms, duration: 400.ms)
-                .slideY(begin: 0.2, end: 0, delay: 200.ms, duration: 400.ms),
-            const SizedBox(height: 12),
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 8),
-              child: Text(
-                'Le quiz qui célèbre la culture et l\'histoire de la Côte d\'Ivoire',
-                textAlign: TextAlign.center,
-                style: GoogleFonts.nunito(
-                  fontSize: 15,
-                  fontWeight: FontWeight.w400,
-                  color: _textGray,
-                  height: 1.45,
-                ),
-              ),
-            ).animate().fadeIn(delay: 300.ms, duration: 400.ms),
-          ],
-        ),
+            ),
+          ).animate().fadeIn(delay: 300.ms, duration: 400.ms),
+        ],
       ),
     );
   }
 
   Widget _buildSlide2() {
-    return SingleChildScrollView(
-      padding: const EdgeInsets.symmetric(horizontal: 24),
-      child: SizedBox(
-        height: 520,
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            SizedBox(
-              width: 280,
-              height: 200,
-              child: Stack(
-                clipBehavior: Clip.none,
-                alignment: Alignment.center,
-                children: [
-                  _buildMascotAsset('assets/images/kwame_thinking.png', height: 180)
-                      .animate()
-                      .fadeIn(duration: 600.ms)
-                      .slideY(begin: 0.3, end: 0, duration: 600.ms),
-                  _floatingCard(
-                    icon: Icons.menu_book_rounded,
-                    backgroundColor: const Color(0xFFFFF3E8),
-                    iconColor: _orange,
-                    left: 12,
-                    top: 20,
-                  ),
-                  _floatingCard(
-                    icon: Icons.restaurant_rounded,
-                    backgroundColor: const Color(0xFFFFF3E8),
-                    iconColor: _orange,
-                    left: 24,
-                    bottom: 28,
-                  ),
-                  _floatingCard(
-                    icon: Icons.location_on_outlined,
-                    backgroundColor: const Color(0xFFE8F5E9),
-                    iconColor: const Color(0xFF2E7D32),
-                    right: 12,
-                    top: 48,
-                  ),
-                ],
-              ),
+    return _buildSlideLayout(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          SizedBox(
+            width: 280,
+            height: 200,
+            child: Stack(
+              clipBehavior: Clip.none,
+              alignment: Alignment.center,
+              children: [
+                _buildMascotAsset('assets/images/kwame_thinking.png', height: 180)
+                    .animate()
+                    .fadeIn(duration: 600.ms)
+                    .slideY(begin: 0.3, end: 0, duration: 600.ms),
+                _floatingCard(
+                  icon: Icons.menu_book_rounded,
+                  backgroundColor: const Color(0xFFFFF3E8),
+                  iconColor: _orange,
+                  left: 12,
+                  top: 20,
+                ),
+                _floatingCard(
+                  icon: Icons.restaurant_rounded,
+                  backgroundColor: const Color(0xFFFFF3E8),
+                  iconColor: _orange,
+                  left: 24,
+                  bottom: 28,
+                ),
+                _floatingCard(
+                  icon: Icons.location_on_outlined,
+                  backgroundColor: const Color(0xFFE8F5E9),
+                  iconColor: const Color(0xFF2E7D32),
+                  right: 12,
+                  top: 48,
+                ),
+              ],
             ),
-            const SizedBox(height: 28),
-            Text(
-              'Teste tes connaissances',
+          ),
+          const SizedBox(height: 28),
+          Text(
+            'Teste tes connaissances',
+            textAlign: TextAlign.center,
+            style: GoogleFonts.nunito(
+              fontSize: 26,
+              fontWeight: FontWeight.w800,
+              color: _textDark,
+            ),
+          )
+              .animate()
+              .fadeIn(delay: 200.ms, duration: 400.ms)
+              .slideY(begin: 0.2, end: 0, delay: 200.ms, duration: 400.ms),
+          const SizedBox(height: 12),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 8),
+            child: Text(
+              '10 questions par session — Histoire, Géographie, Gastronomie. Réponds vite pour gagner plus de points !',
               textAlign: TextAlign.center,
               style: GoogleFonts.nunito(
-                fontSize: 26,
-                fontWeight: FontWeight.w800,
-                color: _textDark,
+                fontSize: 15,
+                fontWeight: FontWeight.w400,
+                color: _textGray,
+                height: 1.45,
               ),
-            )
-                .animate()
-                .fadeIn(delay: 200.ms, duration: 400.ms)
-                .slideY(begin: 0.2, end: 0, delay: 200.ms, duration: 400.ms),
-            const SizedBox(height: 12),
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 8),
-              child: Text(
-                '10 questions par session — Histoire, Géographie, Gastronomie. Réponds vite pour gagner plus de points !',
-                textAlign: TextAlign.center,
-                style: GoogleFonts.nunito(
-                  fontSize: 15,
-                  fontWeight: FontWeight.w400,
-                  color: _textGray,
-                  height: 1.45,
-                ),
-              ),
-            ).animate().fadeIn(delay: 300.ms, duration: 400.ms),
-            const SizedBox(height: 24),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                _pill('10\nquestions'),
-                const SizedBox(width: 12),
-                _pill('20 sec /\nquestion'),
-                const SizedBox(width: 12),
-                _pill('Bonus\nrapidité'),
-              ],
-            )
-                .animate()
-                .fadeIn(delay: 400.ms, duration: 300.ms)
-                .slideY(begin: 0.2, end: 0, delay: 400.ms, duration: 300.ms),
-          ],
-        ),
+            ),
+          ).animate().fadeIn(delay: 300.ms, duration: 400.ms),
+          const SizedBox(height: 24),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              _pill('10\nquestions'),
+              const SizedBox(width: 12),
+              _pill('20 sec /\nquestion'),
+              const SizedBox(width: 12),
+              _pill('Bonus\nrapidité'),
+            ],
+          )
+              .animate()
+              .fadeIn(delay: 400.ms, duration: 300.ms)
+              .slideY(begin: 0.2, end: 0, delay: 400.ms, duration: 300.ms),
+        ],
       ),
     );
   }
 
   Widget _buildSlide3() {
-    return SingleChildScrollView(
-      padding: const EdgeInsets.symmetric(horizontal: 24),
-      child: SizedBox(
-        height: 520,
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            _buildMascotAsset('assets/images/kwame_correct.png', height: 180)
-                .animate()
-                .fadeIn(duration: 600.ms)
-                .slideY(begin: 0.3, end: 0, duration: 600.ms),
-            const SizedBox(height: 16),
-            _buildPodium()
-                .animate()
-                .fadeIn(delay: 200.ms, duration: 500.ms)
-                .scale(begin: const Offset(0.8, 0.8), end: const Offset(1, 1), delay: 200.ms, duration: 500.ms),
-            const SizedBox(height: 24),
-            Text(
-              'Défie tes amis',
+    return _buildSlideLayout(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          _buildMascotAsset('assets/images/kwame_correct.png', height: 180)
+              .animate()
+              .fadeIn(duration: 600.ms)
+              .slideY(begin: 0.3, end: 0, duration: 600.ms),
+          const SizedBox(height: 16),
+          _buildPodium()
+              .animate()
+              .fadeIn(delay: 200.ms, duration: 500.ms)
+              .scale(
+                begin: const Offset(0.8, 0.8),
+                end: const Offset(1, 1),
+                delay: 200.ms,
+                duration: 500.ms,
+              ),
+          const SizedBox(height: 24),
+          Text(
+            'Défie tes amis',
+            textAlign: TextAlign.center,
+            style: GoogleFonts.nunito(
+              fontSize: 26,
+              fontWeight: FontWeight.w800,
+              color: _textDark,
+            ),
+          )
+              .animate()
+              .fadeIn(delay: 200.ms, duration: 400.ms)
+              .slideY(begin: 0.2, end: 0, delay: 200.ms, duration: 400.ms),
+          const SizedBox(height: 12),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 8),
+            child: Text(
+              'Ajoute tes amis via leur code unique et monte dans le classement ivoirien !',
               textAlign: TextAlign.center,
               style: GoogleFonts.nunito(
-                fontSize: 26,
-                fontWeight: FontWeight.w800,
-                color: _textDark,
+                fontSize: 15,
+                fontWeight: FontWeight.w400,
+                color: _textGray,
+                height: 1.45,
               ),
-            )
-                .animate()
-                .fadeIn(delay: 200.ms, duration: 400.ms)
-                .slideY(begin: 0.2, end: 0, delay: 200.ms, duration: 400.ms),
-            const SizedBox(height: 12),
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 8),
-              child: Text(
-                'Ajoute tes amis via leur code unique et monte dans le classement ivoirien !',
-                textAlign: TextAlign.center,
-                style: GoogleFonts.nunito(
-                  fontSize: 15,
-                  fontWeight: FontWeight.w400,
-                  color: _textGray,
-                  height: 1.45,
-                ),
-              ),
-            ).animate().fadeIn(delay: 300.ms, duration: 400.ms),
-          ],
-        ),
+            ),
+          ).animate().fadeIn(delay: 300.ms, duration: 400.ms),
+        ],
       ),
+    );
+  }
+
+  Widget _buildSlideLayout({required Widget child}) {
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        return SingleChildScrollView(
+          padding: const EdgeInsets.symmetric(horizontal: 24),
+          child: ConstrainedBox(
+            constraints: BoxConstraints(minHeight: constraints.maxHeight),
+            child: child,
+          ),
+        );
+      },
     );
   }
 
