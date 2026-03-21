@@ -13,24 +13,42 @@ class OnboardingScreen extends StatefulWidget {
 
 class _OnboardingScreenState extends State<OnboardingScreen> {
   static const Color _orange = Color(0xFFF77F00);
-  static const Color _textDark = Color(0xFF1F2937);
+  static const Color _textDark = Color(0xFF1A1A2E);
   static const Color _textGray = Color(0xFF6B7280);
+  static const Color _cardBg = Color(0xFFF8F9FA);
 
-  final PageController _pageController = PageController();
+  late final PageController _pageController;
+  int _currentPage = 0;
   final FlutterSecureStorage _storage = const FlutterSecureStorage();
 
-  int _currentPage = 0;
+  @override
+  void initState() {
+    super.initState();
+    _pageController = PageController();
+    _pageController.addListener(_onPageScroll);
+  }
 
-  Future<void> _finishOnboarding() async {
-    await _storage.write(key: 'onboarding_done', value: 'true');
-    if (!mounted) return;
-    context.go('/auth');
+  void _onPageScroll() {
+    final page = _pageController.page;
+    if (page == null) return;
+    final roundedPage = page.round();
+    if (roundedPage != _currentPage && mounted) {
+      setState(() => _currentPage = roundedPage);
+    }
   }
 
   @override
   void dispose() {
+    _pageController.removeListener(_onPageScroll);
     _pageController.dispose();
     super.dispose();
+  }
+
+  Future<void> _finishOnboarding() async {
+    await _storage.write(key: 'onboarding_done', value: 'true');
+    if (mounted) {
+      context.go('/auth');
+    }
   }
 
   @override
@@ -39,17 +57,18 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
       backgroundColor: Colors.white,
       body: Stack(
         children: [
-          const Positioned.fill(child: KentePattern()),
+          CustomPaint(
+            painter: KentePatternPainter(),
+            size: Size.infinite,
+          ),
           SafeArea(
             child: Column(
               children: [
-                _buildSkipButton(),
+                _buildTopBar(),
                 Expanded(
                   child: PageView(
                     controller: _pageController,
-                    onPageChanged: (value) {
-                      setState(() => _currentPage = value);
-                    },
+                    onPageChanged: (i) => setState(() => _currentPage = i),
                     children: [
                       _buildSlide1(),
                       _buildSlide2(),
@@ -57,7 +76,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                     ],
                   ),
                 ),
-                _buildBottomSection(),
+                _buildBottomBar(),
               ],
             ),
           ),
@@ -66,16 +85,15 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
     );
   }
 
-  Widget _buildSkipButton() {
-    final showSkip = _currentPage == 1;
+  Widget _buildTopBar() {
     return SizedBox(
-      height: 56,
-      child: Align(
-        alignment: Alignment.centerRight,
-        child: Padding(
-          padding: const EdgeInsets.only(right: 20),
-          child: showSkip
-              ? TextButton(
+      height: 48,
+      child: _currentPage == 1
+          ? Align(
+              alignment: Alignment.centerRight,
+              child: Padding(
+                padding: const EdgeInsets.only(right: 16),
+                child: TextButton(
                   onPressed: _finishOnboarding,
                   child: Text(
                     'Passer',
@@ -85,255 +103,342 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                       color: _textGray,
                     ),
                   ),
-                )
-              : const SizedBox.shrink(),
-        ),
-      ),
+                ),
+              ),
+            )
+          : const SizedBox.shrink(),
     );
   }
 
   Widget _buildSlide1() {
-    return _buildSlideLayout(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          _buildMascotAsset('assets/images/kwame_welcome.png', height: 220)
-              .animate()
-              .fadeIn(duration: 600.ms)
-              .slideY(begin: 0.3, end: 0, duration: 600.ms),
-          const SizedBox(height: 32),
-          Text(
-            'Bienvenue sur IvoireQuiz !',
-            textAlign: TextAlign.center,
-            style: GoogleFonts.nunito(
-              fontSize: 26,
-              fontWeight: FontWeight.w800,
-              color: _textDark,
-            ),
-          )
-              .animate()
-              .fadeIn(delay: 200.ms, duration: 400.ms)
-              .slideY(begin: 0.2, end: 0, delay: 200.ms, duration: 400.ms),
-          const SizedBox(height: 12),
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 8),
-            child: Text(
-              'Le quiz qui célèbre la culture et l\'histoire de la Côte d\'Ivoire',
-              textAlign: TextAlign.center,
-              style: GoogleFonts.nunito(
-                fontSize: 15,
-                fontWeight: FontWeight.w400,
-                color: _textGray,
-                height: 1.45,
-              ),
-            ),
-          ).animate().fadeIn(delay: 300.ms, duration: 400.ms),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildSlide2() {
-    return _buildSlideLayout(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          SizedBox(
-            width: 280,
-            height: 200,
-            child: Stack(
-              clipBehavior: Clip.none,
-              alignment: Alignment.center,
-              children: [
-                _buildMascotAsset('assets/images/kwame_thinking.png', height: 180)
-                    .animate()
-                    .fadeIn(duration: 600.ms)
-                    .slideY(begin: 0.3, end: 0, duration: 600.ms),
-                _floatingCard(
-                  icon: Icons.menu_book_rounded,
-                  backgroundColor: const Color(0xFFFFF3E8),
-                  iconColor: _orange,
-                  left: 12,
-                  top: 20,
-                ),
-                _floatingCard(
-                  icon: Icons.restaurant_rounded,
-                  backgroundColor: const Color(0xFFFFF3E8),
-                  iconColor: _orange,
-                  left: 24,
-                  bottom: 28,
-                ),
-                _floatingCard(
-                  icon: Icons.location_on_outlined,
-                  backgroundColor: const Color(0xFFE8F5E9),
-                  iconColor: const Color(0xFF2E7D32),
-                  right: 12,
-                  top: 48,
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(height: 28),
-          Text(
-            'Teste tes connaissances',
-            textAlign: TextAlign.center,
-            style: GoogleFonts.nunito(
-              fontSize: 26,
-              fontWeight: FontWeight.w800,
-              color: _textDark,
-            ),
-          )
-              .animate()
-              .fadeIn(delay: 200.ms, duration: 400.ms)
-              .slideY(begin: 0.2, end: 0, delay: 200.ms, duration: 400.ms),
-          const SizedBox(height: 12),
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 8),
-            child: Text(
-              '10 questions par session — Histoire, Géographie, Gastronomie. Réponds vite pour gagner plus de points !',
-              textAlign: TextAlign.center,
-              style: GoogleFonts.nunito(
-                fontSize: 15,
-                fontWeight: FontWeight.w400,
-                color: _textGray,
-                height: 1.45,
-              ),
-            ),
-          ).animate().fadeIn(delay: 300.ms, duration: 400.ms),
-          const SizedBox(height: 24),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              _pill('10\nquestions'),
-              const SizedBox(width: 12),
-              _pill('20 sec /\nquestion'),
-              const SizedBox(width: 12),
-              _pill('Bonus\nrapidité'),
-            ],
-          )
-              .animate()
-              .fadeIn(delay: 400.ms, duration: 300.ms)
-              .slideY(begin: 0.2, end: 0, delay: 400.ms, duration: 300.ms),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildSlide3() {
-    return _buildSlideLayout(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          _buildMascotAsset('assets/images/kwame_correct.png', height: 180)
-              .animate()
-              .fadeIn(duration: 600.ms)
-              .slideY(begin: 0.3, end: 0, duration: 600.ms),
-          const SizedBox(height: 16),
-          _buildPodium()
-              .animate()
-              .fadeIn(delay: 200.ms, duration: 500.ms)
-              .scale(
-                begin: const Offset(0.8, 0.8),
-                end: const Offset(1, 1),
-                delay: 200.ms,
-                duration: 500.ms,
-              ),
-          const SizedBox(height: 24),
-          Text(
-            'Défie tes amis',
-            textAlign: TextAlign.center,
-            style: GoogleFonts.nunito(
-              fontSize: 26,
-              fontWeight: FontWeight.w800,
-              color: _textDark,
-            ),
-          )
-              .animate()
-              .fadeIn(delay: 200.ms, duration: 400.ms)
-              .slideY(begin: 0.2, end: 0, delay: 200.ms, duration: 400.ms),
-          const SizedBox(height: 12),
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 8),
-            child: Text(
-              'Ajoute tes amis via leur code unique et monte dans le classement ivoirien !',
-              textAlign: TextAlign.center,
-              style: GoogleFonts.nunito(
-                fontSize: 15,
-                fontWeight: FontWeight.w400,
-                color: _textGray,
-                height: 1.45,
-              ),
-            ),
-          ).animate().fadeIn(delay: 300.ms, duration: 400.ms),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildSlideLayout({required Widget child}) {
     return LayoutBuilder(
       builder: (context, constraints) {
         return SingleChildScrollView(
-          padding: const EdgeInsets.symmetric(horizontal: 24),
           child: ConstrainedBox(
             constraints: BoxConstraints(minHeight: constraints.maxHeight),
-            child: child,
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 24),
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Image.asset(
+                    'assets/images/kwame.png',
+                    height: 220,
+                    fit: BoxFit.contain,
+                  )
+                      .animate()
+                      .fadeIn(duration: 600.ms)
+                      .slideY(begin: 0.3, duration: 600.ms),
+                  const SizedBox(height: 32),
+                  Text(
+                    'Bienvenue sur IvoireQuiz !',
+                    style: GoogleFonts.nunito(
+                      fontSize: 26,
+                      fontWeight: FontWeight.w800,
+                      color: _textDark,
+                    ),
+                    textAlign: TextAlign.center,
+                  )
+                      .animate()
+                      .fadeIn(duration: 400.ms, delay: 200.ms)
+                      .slideY(begin: 0.2, duration: 400.ms, delay: 200.ms),
+                  const SizedBox(height: 12),
+                  Text(
+                    'Le quiz qui célèbre la culture\net l\'histoire de la Côte d\'Ivoire',
+                    style: GoogleFonts.nunito(
+                      fontSize: 15,
+                      color: _textGray,
+                      height: 1.6,
+                    ),
+                    textAlign: TextAlign.center,
+                  ).animate().fadeIn(duration: 400.ms, delay: 300.ms),
+                  const SizedBox(height: 40),
+                ],
+              ),
+            ),
           ),
         );
       },
     );
   }
 
-  Widget _buildBottomSection() {
-    final ctaText = _currentPage == 2 ? 'Créer mon compte' : 'Commencer';
+  Widget _buildSlide2() {
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        return SingleChildScrollView(
+          child: ConstrainedBox(
+            constraints: BoxConstraints(minHeight: constraints.maxHeight),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 24),
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  SizedBox(
+                    height: 200,
+                    width: double.infinity,
+                    child: Stack(
+                      alignment: Alignment.center,
+                      children: [
+                        Image.asset(
+                          'assets/images/kwame.png',
+                          height: 180,
+                          fit: BoxFit.contain,
+                        )
+                            .animate()
+                            .fadeIn(duration: 600.ms)
+                            .slideY(begin: 0.3, duration: 600.ms),
+                        Positioned(
+                          left: 20,
+                          top: 20,
+                          child: _buildFloatingIcon(
+                            icon: Icons.menu_book_rounded,
+                            color: _orange,
+                            bgColor: const Color(0xFFFFF3E8),
+                          )
+                              .animate()
+                              .fadeIn(delay: 300.ms)
+                              .slideX(begin: -0.3, delay: 300.ms),
+                        ),
+                        Positioned(
+                          left: 10,
+                          bottom: 20,
+                          child: _buildFloatingIcon(
+                            icon: Icons.restaurant,
+                            color: _orange,
+                            bgColor: const Color(0xFFFFF3E8),
+                          )
+                              .animate()
+                              .fadeIn(delay: 400.ms)
+                              .slideX(begin: -0.3, delay: 400.ms),
+                        ),
+                        Positioned(
+                          right: 20,
+                          top: 40,
+                          child: _buildFloatingIcon(
+                            icon: Icons.location_on,
+                            color: const Color(0xFF22C55E),
+                            bgColor: const Color(0xFFE8F5E9),
+                          )
+                              .animate()
+                              .fadeIn(delay: 350.ms)
+                              .slideX(begin: 0.3, delay: 350.ms),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 28),
+                  Text(
+                    'Teste tes connaissances',
+                    textAlign: TextAlign.center,
+                    style: GoogleFonts.nunito(
+                      fontSize: 26,
+                      fontWeight: FontWeight.w800,
+                      color: _textDark,
+                    ),
+                  )
+                      .animate()
+                      .fadeIn(duration: 400.ms, delay: 200.ms)
+                      .slideY(begin: 0.2, duration: 400.ms, delay: 200.ms),
+                  const SizedBox(height: 12),
+                  Text(
+                    '10 questions par session — Histoire,\nGéographie, Gastronomie. Réponds vite\npour gagner plus de points !',
+                    textAlign: TextAlign.center,
+                    style: GoogleFonts.nunito(
+                      fontSize: 15,
+                      color: _textGray,
+                      height: 1.6,
+                    ),
+                  ).animate().fadeIn(duration: 400.ms, delay: 300.ms),
+                  const SizedBox(height: 24),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      _buildPill('10', 'questions'),
+                      const SizedBox(width: 12),
+                      _buildPill('20 sec /', 'question'),
+                      const SizedBox(width: 12),
+                      _buildPill('Bonus', 'rapidité'),
+                    ],
+                  )
+                      .animate()
+                      .fadeIn(duration: 300.ms, delay: 400.ms)
+                      .slideY(begin: 0.2, delay: 400.ms),
+                  const SizedBox(height: 40),
+                ],
+              ),
+            ),
+          ),
+        );
+      },
+    );
+  }
 
+  Widget _buildSlide3() {
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        return SingleChildScrollView(
+          child: ConstrainedBox(
+            constraints: BoxConstraints(minHeight: constraints.maxHeight),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 24),
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Image.asset(
+                    'assets/images/kwame.png',
+                    height: 160,
+                    fit: BoxFit.contain,
+                  )
+                      .animate()
+                      .fadeIn(duration: 600.ms)
+                      .slideY(begin: 0.3, duration: 600.ms),
+                  const SizedBox(height: 16),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    crossAxisAlignment: CrossAxisAlignment.end,
+                    children: [
+                      _buildPodiumColumn(
+                        rank: 2,
+                        height: 80,
+                        color: const Color(0xFFD3D1C7),
+                        textColor: Colors.white,
+                      ),
+                      const SizedBox(width: 8),
+                      _buildPodiumColumn(
+                        rank: 1,
+                        height: 110,
+                        color: _orange,
+                        isWinner: true,
+                      ),
+                      const SizedBox(width: 8),
+                      _buildPodiumColumn(
+                        rank: 3,
+                        height: 65,
+                        color: const Color(0xFF8B6914),
+                        textColor: Colors.white,
+                      ),
+                    ],
+                  )
+                      .animate()
+                      .fadeIn(duration: 500.ms, delay: 200.ms)
+                      .scale(begin: const Offset(0.8, 0.8), delay: 200.ms),
+                  const SizedBox(height: 24),
+                  Text(
+                    'Défie tes amis',
+                    textAlign: TextAlign.center,
+                    style: GoogleFonts.nunito(
+                      fontSize: 26,
+                      fontWeight: FontWeight.w800,
+                      color: _textDark,
+                    ),
+                  )
+                      .animate()
+                      .fadeIn(duration: 400.ms, delay: 300.ms)
+                      .slideY(begin: 0.2, delay: 300.ms),
+                  const SizedBox(height: 12),
+                  Text(
+                    'Ajoute tes amis via leur code unique\net monte dans le classement ivoirien !',
+                    textAlign: TextAlign.center,
+                    style: GoogleFonts.nunito(
+                      fontSize: 15,
+                      color: _textGray,
+                    ),
+                  ).animate().fadeIn(duration: 400.ms, delay: 400.ms),
+                  const SizedBox(height: 40),
+                ],
+              ),
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildBottomBar() {
     return Padding(
-      padding: const EdgeInsets.fromLTRB(24, 8, 24, 20),
+      padding: const EdgeInsets.fromLTRB(24, 0, 24, 32),
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
           _buildPageIndicator(),
           const SizedBox(height: 20),
-          _buildCTAButton(
-            ctaText,
-            () {
-              if (_currentPage == 0 || _currentPage == 1) {
-                _pageController.nextPage(
-                  duration: 300.ms,
-                  curve: Curves.easeOut,
-                );
-              } else {
-                _finishOnboarding();
-              }
-            },
-          ),
-          if (_currentPage == 2) ...[
-            const SizedBox(height: 12),
-            TextButton(
-              onPressed: _finishOnboarding,
-              child: RichText(
-                text: TextSpan(
-                  style: GoogleFonts.nunito(
-                    fontSize: 14,
-                    fontWeight: FontWeight.w400,
-                    color: _textGray,
+          if (_currentPage < 2)
+            SizedBox(
+              width: double.infinity,
+              height: 56,
+              child: ElevatedButton(
+                onPressed: () => _pageController.nextPage(
+                  duration: const Duration(milliseconds: 300),
+                  curve: Curves.easeInOut,
+                ),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: _orange,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(16),
                   ),
-                  children: [
-                    const TextSpan(text: 'J\'ai déjà un compte — '),
-                    TextSpan(
-                      text: 'Connexion',
-                      style: GoogleFonts.nunito(
-                        fontSize: 14,
-                        fontWeight: FontWeight.w600,
-                        color: _orange,
-                        decoration: TextDecoration.underline,
-                      ),
-                    ),
-                  ],
+                ),
+                child: Text(
+                  _currentPage == 0 ? 'Commencer' : 'Commencer',
+                  style: GoogleFonts.nunito(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w700,
+                    color: Colors.white,
+                  ),
                 ),
               ),
             ),
-          ],
+          if (_currentPage == 2)
+            Column(
+              children: [
+                SizedBox(
+                  width: double.infinity,
+                  height: 56,
+                  child: ElevatedButton(
+                    onPressed: _finishOnboarding,
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: _orange,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(16),
+                      ),
+                    ),
+                    child: Text(
+                      'Créer mon compte',
+                      style: GoogleFonts.nunito(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w700,
+                        color: Colors.white,
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 12),
+                GestureDetector(
+                  onTap: _finishOnboarding,
+                  child: RichText(
+                    text: TextSpan(
+                      children: [
+                        TextSpan(
+                          text: 'J\'ai déjà un compte — ',
+                          style: GoogleFonts.nunito(
+                            fontSize: 14,
+                            color: _textGray,
+                          ),
+                        ),
+                        TextSpan(
+                          text: 'Connexion',
+                          style: GoogleFonts.nunito(
+                            fontSize: 14,
+                            color: _orange,
+                            decoration: TextDecoration.underline,
+                            decorationColor: _orange,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
+            ),
         ],
       ),
     );
@@ -342,179 +447,121 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
   Widget _buildPageIndicator() {
     return Row(
       mainAxisAlignment: MainAxisAlignment.center,
-      children: List.generate(3, (index) {
-        final isActive = index == _currentPage;
-        return AnimatedContainer(
-          duration: 250.ms,
+      children: List.generate(
+        3,
+        (i) => AnimatedContainer(
+          duration: const Duration(milliseconds: 300),
           margin: const EdgeInsets.symmetric(horizontal: 3),
-          width: isActive ? 24 : 8,
+          width: _currentPage == i ? 24 : 8,
           height: 8,
           decoration: BoxDecoration(
-            color: isActive ? _orange : const Color(0xFFD1D5DB),
+            color: _currentPage == i ? _orange : const Color(0xFFE5E7EB),
             borderRadius: BorderRadius.circular(4),
-          ),
-        );
-      }),
-    );
-  }
-
-  Widget _buildCTAButton(String text, VoidCallback action) {
-    return SizedBox(
-      width: double.infinity,
-      height: 56,
-      child: ElevatedButton(
-        onPressed: action,
-        style: ElevatedButton.styleFrom(
-          backgroundColor: _orange,
-          foregroundColor: Colors.white,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(16),
-          ),
-          elevation: 0,
-        ),
-        child: Text(
-          text,
-          style: GoogleFonts.nunito(
-            fontSize: 16,
-            fontWeight: FontWeight.w700,
-            color: Colors.white,
           ),
         ),
       ),
     );
   }
 
-  Widget _pill(String label) {
+  Widget _buildFloatingIcon({
+    required IconData icon,
+    required Color color,
+    required Color bgColor,
+  }) {
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: bgColor,
+        borderRadius: BorderRadius.circular(12),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.08),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Icon(icon, color: color, size: 22),
+    );
+  }
+
+  Widget _buildPill(String line1, String line2) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
       decoration: BoxDecoration(
-        color: const Color(0xFFF8F9FA),
+        color: _cardBg,
         borderRadius: BorderRadius.circular(12),
-      ),
-      child: Text(
-        label,
-        textAlign: TextAlign.center,
-        style: GoogleFonts.nunito(
-          fontSize: 13,
-          fontWeight: FontWeight.w700,
-          color: _textDark,
-          height: 1.35,
+        border: Border.all(
+          color: const Color(0xFFE5E7EB),
+          width: 1,
         ),
       ),
-    );
-  }
-
-  Widget _floatingCard({
-    required IconData icon,
-    required Color backgroundColor,
-    required Color iconColor,
-    double? left,
-    double? right,
-    double? top,
-    double? bottom,
-  }) {
-    return Positioned(
-      left: left,
-      right: right,
-      top: top,
-      bottom: bottom,
-      child: Container(
-        padding: const EdgeInsets.all(12),
-        decoration: BoxDecoration(
-          color: backgroundColor,
-          borderRadius: BorderRadius.circular(12),
-          boxShadow: const [
-            BoxShadow(
-              color: Color(0x14000000),
-              blurRadius: 12,
-              offset: Offset(0, 4),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(
+            line1,
+            style: GoogleFonts.nunito(
+              fontSize: 13,
+              fontWeight: FontWeight.w700,
+              color: _textDark,
             ),
-          ],
-        ),
-        child: Icon(icon, color: iconColor, size: 20),
+          ),
+          Text(
+            line2,
+            style: GoogleFonts.nunito(
+              fontSize: 13,
+              fontWeight: FontWeight.w700,
+              color: _textDark,
+            ),
+          ),
+        ],
       ),
     );
   }
 
-  Widget _buildPodium() {
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.center,
-      crossAxisAlignment: CrossAxisAlignment.end,
-      children: [
-        _podiumItem(
-          rank: '2',
-          columnColor: const Color(0xFFD3D1C7),
-          avatarColor: const Color(0xFFA8AFBA),
-          columnHeight: 80,
-          avatarSize: 36,
-        ),
-        const SizedBox(width: 8),
-        _podiumItem(
-          rank: '1',
-          columnColor: _orange,
-          avatarColor: _orange,
-          columnHeight: 110,
-          avatarSize: 44,
-          crown: true,
-        ),
-        const SizedBox(width: 8),
-        _podiumItem(
-          rank: '3',
-          columnColor: const Color(0xFF8B6914),
-          avatarColor: const Color(0xFFB66900),
-          columnHeight: 65,
-          avatarSize: 36,
-        ),
-      ],
-    );
-  }
-
-  Widget _podiumItem({
-    required String rank,
-    required Color columnColor,
-    required Color avatarColor,
-    required double columnHeight,
-    required double avatarSize,
-    bool crown = false,
+  Widget _buildPodiumColumn({
+    required int rank,
+    required double height,
+    required Color color,
+    Color textColor = Colors.white,
+    bool isWinner = false,
   }) {
     return Column(
       mainAxisSize: MainAxisSize.min,
       children: [
         Container(
-          width: avatarSize,
-          height: avatarSize,
+          width: isWinner ? 44 : 36,
+          height: isWinner ? 44 : 36,
           decoration: BoxDecoration(
-            color: avatarColor,
+            color: color,
             shape: BoxShape.circle,
             border: Border.all(color: Colors.white, width: 2),
           ),
-          child: crown
+          child: isWinner
               ? ClipOval(
                   child: Image.asset(
-                    'assets/images/kwame_mini.png',
+                    'assets/images/kwame.png',
                     fit: BoxFit.cover,
-                    errorBuilder: (_, __, ___) => const Center(
-                      child: Text('👑', style: TextStyle(fontSize: 18)),
-                    ),
                   ),
                 )
               : Center(
                   child: Text(
-                    rank,
+                    rank.toString(),
                     style: GoogleFonts.nunito(
-                      color: Colors.white,
+                      color: textColor,
                       fontWeight: FontWeight.w800,
                       fontSize: 16,
                     ),
                   ),
                 ),
         ),
-        const SizedBox(height: 8),
+        const SizedBox(height: 4),
         Container(
           width: 60,
-          height: columnHeight,
+          height: height,
           decoration: BoxDecoration(
-            color: columnColor,
+            color: color,
             borderRadius: const BorderRadius.only(
               topLeft: Radius.circular(8),
               topRight: Radius.circular(8),
@@ -524,62 +571,28 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
       ],
     );
   }
-
-  Widget _buildMascotAsset(String path, {required double height}) {
-    return Image.asset(
-      path,
-      height: height,
-      fit: BoxFit.contain,
-      errorBuilder: (_, __, ___) => Container(
-        height: 200,
-        width: 200,
-        decoration: const BoxDecoration(
-          color: Color(0xFFFFF3E8),
-          shape: BoxShape.circle,
-        ),
-        child: const Center(
-          child: Text(
-            '🐘',
-            style: TextStyle(fontSize: 80),
-          ),
-        ),
-      ),
-    );
-  }
 }
 
-class KentePattern extends StatelessWidget {
-  const KentePattern({super.key});
-
-  @override
-  Widget build(BuildContext context) {
-    return CustomPaint(
-      painter: _KentePatternPainter(),
-      size: Size.infinite,
-    );
-  }
-}
-
-class _KentePatternPainter extends CustomPainter {
-  static const Color _patternColor = Color(0xFFF77F00);
-
+class KentePatternPainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {
-    const diamondSize = 20.0;
-    const spacing = 8.0;
-    const step = diamondSize + spacing;
+    const diamondWidth = 16.0;
+    const diamondHeight = 16.0;
+    const spacing = 10.0;
+    const stepX = diamondWidth + spacing;
+    const stepY = diamondHeight + spacing;
 
-    final paint = Paint()..color = _patternColor.withOpacity(0.04);
+    final paint = Paint()..color = const Color(0xFFF77F00).withOpacity(0.04);
 
-    for (double y = -step; y <= size.height + step; y += step) {
-      for (double x = -step; x <= size.width + step; x += step) {
-        final center = Offset(x, y);
+    for (double y = -stepY; y <= size.height + stepY; y += stepY) {
+      for (double x = -stepX; x <= size.width + stepX; x += stepX) {
         final path = Path()
-          ..moveTo(center.dx, center.dy - diamondSize / 2)
-          ..lineTo(center.dx + diamondSize / 2, center.dy)
-          ..lineTo(center.dx, center.dy + diamondSize / 2)
-          ..lineTo(center.dx - diamondSize / 2, center.dy)
+          ..moveTo(x, y - (diamondHeight / 2))
+          ..lineTo(x + (diamondWidth / 2), y)
+          ..lineTo(x, y + (diamondHeight / 2))
+          ..lineTo(x - (diamondWidth / 2), y)
           ..close();
+
         canvas.drawPath(path, paint);
       }
     }
