@@ -32,70 +32,106 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   }
 
   Future<void> _loadData() async {
-    if (!mounted) return;
-
     setState(() => _isLoading = true);
+    
     try {
-      final String? token = await _storage.read(key: 'auth_token');
+      final token = await const FlutterSecureStorage()
+        .read(key: 'auth_token');
 
-      final Dio dio = Dio(
-        BaseOptions(
-          baseUrl: 'http://10.0.2.2:8000/api',
-          connectTimeout: const Duration(seconds: 10),
-          receiveTimeout: const Duration(seconds: 10),
-          headers: <String, String>{
-            'Accept': 'application/json',
-            'Content-Type': 'application/json',
-            'Authorization': 'Bearer $token',
-          },
-        ),
-      );
+      debugPrint('TOKEN: $token');
 
-      final List<Response<dynamic>> results = await Future.wait<Response<dynamic>>(<Future<Response<dynamic>>>[
-        dio.get<dynamic>('/auth/me'),
-        dio.get<dynamic>('/categories'),
-        dio.get<dynamic>('/sessions'),
+      if (token == null) {
+        if (mounted) context.go('/auth');
+        return;
+      }
+
+      final dio = Dio(BaseOptions(
+        baseUrl: 'http://10.0.2.2:8000/api',
+        connectTimeout: const Duration(seconds: 10),
+        receiveTimeout: const Duration(seconds: 10),
+        headers: {
+          'Accept': 'application/json',
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $token',
+        },
+      ));
+
+      debugPrint('Appel API en cours...');
+
+      final results = await Future.wait([
+        dio.get('/auth/me'),
+        dio.get('/categories'),
+        dio.get('/sessions'),
       ]);
 
-      final Map<String, dynamic> userResponse = results[0].data as Map<String, dynamic>;
-      final Map<String, dynamic> categoriesResponse = results[1].data as Map<String, dynamic>;
-      final Map<String, dynamic> sessionsResponse = results[2].data as Map<String, dynamic>;
-
-      final Map<String, dynamic> user = Map<String, dynamic>.from(
-        userResponse['data'] as Map<String, dynamic>? ?? <String, dynamic>{},
-      );
-      final List<Map<String, dynamic>> categories = List<Map<String, dynamic>>.from(
-        categoriesResponse['data'] as List<dynamic>? ?? <dynamic>[],
-      );
-      final List<dynamic> sessions = sessionsResponse['data'] as List<dynamic>? ?? <dynamic>[];
+      debugPrint('Réponse /auth/me : ${results[0].data}');
+      debugPrint('Réponse /categories : ${results[1].data}');
+      debugPrint('Réponse /sessions : ${results[2].data}');
 
       if (!mounted) return;
+      
+      final userData = results[0].data;
+      final categoriesData = results[1].data;
+      final sessionsData = results[2].data;
+
       setState(() {
-        _user = user;
-        _categories = categories;
-        _lastSession = sessions.isNotEmpty ? Map<String, dynamic>.from(sessions.first as Map) : null;
+        if (userData['success'] == true) {
+          _user = Map<String, dynamic>
+            .from(userData['data']);
+        }
+
+        if (categoriesData['success'] == true) {
+          final list = categoriesData['data'];
+          if (list is List) {
+            _categories = list
+              .map((e) => Map<String, dynamic>.from(e))
+              .toList();
+          }
+        }
+
+        if (sessionsData['success'] == true) {
+          final sessions = sessionsData['data'];
+          if (sessions is List && sessions.isNotEmpty) {
+            _lastSession = Map<String, dynamic>
+              .from(sessions[0]);
+          }
+        }
+
         _loadingCategories = false;
         _loadingSession = false;
         _isLoading = false;
       });
-    } catch (e) {
-      debugPrint('══════════════════════');
-      debugPrint('ERREUR HOME SCREEN: $e');
-      debugPrint('══════════════════════');
-      if (e is DioException) {
-        debugPrint('Status: ${e.response?.statusCode}');
-        debugPrint('Data: ${e.response?.data}');
-        debugPrint('Message: ${e.message}');
+
+      debugPrint('Categories chargées: ${_categories.length}');
+      debugPrint('User: ${_user?['name']}');
+
+    } on DioException catch (e) {
+      debugPrint('ERREUR DIO: ${e.message}');
+      debugPrint('Status: ${e.response?.statusCode}');
+      debugPrint('Data: ${e.response?.data}');
+      
+      if (e.response?.statusCode == 401) {
+        await const FlutterSecureStorage()
+          .delete(key: 'auth_token');
+        if (mounted) context.go('/auth');
+        return;
       }
-      if (!mounted) return;
-      setState(() {
-        _categories = <Map<String, dynamic>>[];
-        _lastSession = null;
-        _user = null;
-        _loadingCategories = false;
-        _loadingSession = false;
-        _isLoading = false;
-      });
+      if (mounted) {
+        setState(() {
+          _loadingCategories = false;
+          _loadingSession = false;
+          _isLoading = false;
+        });
+      }
+    } catch (e) {
+      debugPrint('ERREUR GÉNÉRALE: $e');
+      if (mounted) {
+        setState(() {
+          _loadingCategories = false;
+          _loadingSession = false;
+          _isLoading = false;
+        });
+      }
     }
   }
 
