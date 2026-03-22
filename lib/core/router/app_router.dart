@@ -57,7 +57,7 @@ final Provider<GoRouter> routerProvider = Provider<GoRouter>((Ref ref) {
         path: '/quiz/:categoryId/:mode',
         builder: (BuildContext context, GoRouterState state) {
           final String? categoryIdParam = state.pathParameters['categoryId'];
-          final int? categoryId = categoryIdParam == null || categoryIdParam == 'null'
+          final int? categoryId = categoryIdParam == 'null' || categoryIdParam == null
               ? null
               : int.tryParse(categoryIdParam);
           final String mode = state.pathParameters['mode'] ?? '';
