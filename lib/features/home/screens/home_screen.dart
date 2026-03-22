@@ -67,72 +67,86 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
 
   Future<void> _loadFromApi() async {
     try {
-      final token = await const FlutterSecureStorage().read(key: 'auth_token');
+      final token = await const FlutterSecureStorage()
+          .read(key: 'auth_token');
 
       if (token == null) {
         if (mounted) context.go('/auth');
         return;
       }
 
-      final dio = Dio(
-        BaseOptions(
-          baseUrl: 'http://10.0.2.2:8000/api',
-          connectTimeout: const Duration(seconds: 10),
-          receiveTimeout: const Duration(seconds: 10),
-          headers: {
-            'Accept': 'application/json',
-            'Content-Type': 'application/json',
-            'Authorization': 'Bearer $token',
-          },
-        ),
-      );
+      final dio = Dio(BaseOptions(
+        baseUrl: 'http://10.0.2.2:8000/api',
+        connectTimeout: const Duration(seconds: 10),
+        receiveTimeout: const Duration(seconds: 10),
+        headers: {
+          'Accept': 'application/json',
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $token',
+        },
+      ));
 
-      final response = await dio.get('/home');
+      final results = await Future.wait([
+        dio.get('/auth/me'),
+        dio.get('/categories'),
+        dio.get('/sessions'),
+      ]);
 
-      if (response.data['success'] == true) {
-        final data = response.data['data'] as Map<String, dynamic>;
+      final userData = results[0].data['data'];
+      final categoriesData = results[1].data['data'];
+      final sessionsData = results[2].data['data'];
 
-        // Sauvegarder en cache
-        final prefs = await SharedPreferences.getInstance();
-        await prefs.setString('home_cache', jsonEncode(data));
+      final prefs = await SharedPreferences
+          .getInstance();
 
-        if (!mounted) return;
-        setState(() {
-          _user = data['user'] != null ? Map<String, dynamic>.from(data['user']) : null;
-          _categories = data['categories'] != null
-              ? List<Map<String, dynamic>>.from(
-                  (data['categories'] as List).map((e) => Map<String, dynamic>.from(e)),
-                )
-              : <Map<String, dynamic>>[];
-          _lastSession = data['last_session'] != null ? Map<String, dynamic>.from(data['last_session']) : null;
-          _loadingCategories = false;
-          _loadingSession = false;
-          _isLoading = false;
-        });
-      }
+      if (!mounted) return;
+
+      setState(() {
+        if (userData is Map) {
+          if (userData.containsKey('user')) {
+            _user = Map<String,dynamic>
+                .from(userData['user']);
+          } else {
+            _user = Map<String,dynamic>
+                .from(userData);
+          }
+        }
+
+        if (categoriesData is List) {
+          _categories = categoriesData
+              .map((e) => Map<String,dynamic>.from(e))
+              .toList();
+        }
+
+        if (sessionsData is List &&
+            sessionsData.isNotEmpty) {
+          _lastSession = Map<String,dynamic>
+              .from(sessionsData[0]);
+        }
+
+        _isLoading = false;
+      });
+
+      await prefs.setString('home_cache',
+          jsonEncode({
+            'user': _user,
+            'categories': _categories,
+            'last_session': _lastSession,
+          }));
     } on DioException catch (e) {
       debugPrint('API ERROR: $e');
       if (e.response?.statusCode == 401) {
-        await const FlutterSecureStorage().delete(key: 'auth_token');
+        await const FlutterSecureStorage()
+            .delete(key: 'auth_token');
         if (mounted) context.go('/auth');
         return;
       }
-      if (mounted) {
-        setState(() {
-          _loadingCategories = false;
-          _loadingSession = false;
-          _isLoading = false;
-        });
-      }
+      if (mounted) setState(() =>
+          _isLoading = false);
     } catch (e) {
       debugPrint('ERROR: $e');
-      if (mounted) {
-        setState(() {
-          _loadingCategories = false;
-          _loadingSession = false;
-          _isLoading = false;
-        });
-      }
+      if (mounted) setState(() =>
+          _isLoading = false);
     }
   }
 
