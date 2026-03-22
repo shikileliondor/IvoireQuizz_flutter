@@ -67,8 +67,19 @@ final Provider<GoRouter> routerProvider = Provider<GoRouter>((Ref ref) {
       GoRoute(
         path: '/result',
         builder: (BuildContext context, GoRouterState state) {
-          final Map<String, dynamic> resultData =
-              (state.extra as Map<String, dynamic>?) ?? <String, dynamic>{};
+          final dynamic extra = state.extra;
+          final Map<String, dynamic> resultData;
+
+          if (extra is Map<String, dynamic>) {
+            resultData = extra;
+          } else if (extra is Map) {
+            resultData = Map<String, dynamic>.from(extra);
+          } else if (extra is List && extra.isNotEmpty && extra.first is Map) {
+            resultData = Map<String, dynamic>.from(extra.first as Map);
+          } else {
+            resultData = <String, dynamic>{};
+          }
+
           return ResultScreen(resultData: resultData);
         },
       ),
