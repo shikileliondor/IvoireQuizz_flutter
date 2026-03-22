@@ -32,112 +32,69 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   }
 
   Future<void> _loadData() async {
-    if (!mounted) {
-      return;
-    }
+    if (!mounted) return;
 
-    setState(() {
-      _isLoading = true;
-      _loadingCategories = true;
-      _loadingSession = true;
-    });
-
-    final Dio dio = Dio();
-    dio.options.baseUrl = 'http://10.0.2.2:8000/api';
-
+    setState(() => _isLoading = true);
     try {
       final String? token = await _storage.read(key: 'auth_token');
-      dio.options.headers = <String, String>{
-        'Accept': 'application/json',
-        'Authorization': 'Bearer $token',
-      };
 
-      await Future.wait<void>(<Future<void>>[
-        _loadCategories(dio),
-        _loadSessions(dio),
-        _loadUserProfile(dio),
+      final Dio dio = Dio(
+        BaseOptions(
+          baseUrl: 'http://10.0.2.2:8000/api',
+          connectTimeout: const Duration(seconds: 10),
+          receiveTimeout: const Duration(seconds: 10),
+          headers: <String, String>{
+            'Accept': 'application/json',
+            'Content-Type': 'application/json',
+            'Authorization': 'Bearer $token',
+          },
+        ),
+      );
+
+      final List<Response<dynamic>> results = await Future.wait<Response<dynamic>>(<Future<Response<dynamic>>>[
+        dio.get<dynamic>('/auth/me'),
+        dio.get<dynamic>('/categories'),
+        dio.get<dynamic>('/sessions'),
       ]);
-    } catch (_) {
-      if (!mounted) {
-        return;
-      }
+
+      final Map<String, dynamic> userResponse = results[0].data as Map<String, dynamic>;
+      final Map<String, dynamic> categoriesResponse = results[1].data as Map<String, dynamic>;
+      final Map<String, dynamic> sessionsResponse = results[2].data as Map<String, dynamic>;
+
+      final Map<String, dynamic> user = Map<String, dynamic>.from(
+        userResponse['data'] as Map<String, dynamic>? ?? <String, dynamic>{},
+      );
+      final List<Map<String, dynamic>> categories = List<Map<String, dynamic>>.from(
+        categoriesResponse['data'] as List<dynamic>? ?? <dynamic>[],
+      );
+      final List<dynamic> sessions = sessionsResponse['data'] as List<dynamic>? ?? <dynamic>[];
+
+      if (!mounted) return;
       setState(() {
-        _categories = <Map<String, dynamic>>[];
-        _lastSession = null;
-        _user = null;
-      });
-    } finally {
-      if (!mounted) {
-        return;
-      }
-      setState(() {
+        _user = user;
+        _categories = categories;
+        _lastSession = sessions.isNotEmpty ? Map<String, dynamic>.from(sessions.first as Map) : null;
+        _loadingCategories = false;
+        _loadingSession = false;
         _isLoading = false;
       });
-    }
-  }
-
-  Future<void> _loadCategories(Dio dio) async {
-    try {
-      final Response<dynamic> response = await dio.get<dynamic>('/categories');
-      final List<dynamic> data = (response.data as Map<String, dynamic>)['data'] as List<dynamic>? ?? <dynamic>[];
-      final List<Map<String, dynamic>> categories = List<Map<String, dynamic>>.from(data);
-
-      if (!mounted) {
-        return;
+    } catch (e) {
+      debugPrint('══════════════════════');
+      debugPrint('ERREUR HOME SCREEN: $e');
+      debugPrint('══════════════════════');
+      if (e is DioException) {
+        debugPrint('Status: ${e.response?.statusCode}');
+        debugPrint('Data: ${e.response?.data}');
+        debugPrint('Message: ${e.message}');
       }
-      setState(() {
-        _categories = categories;
-        _loadingCategories = false;
-      });
-    } catch (_) {
-      if (!mounted) {
-        return;
-      }
+      if (!mounted) return;
       setState(() {
         _categories = <Map<String, dynamic>>[];
-        _loadingCategories = false;
-      });
-    }
-  }
-
-  Future<void> _loadSessions(Dio dio) async {
-    try {
-      final Response<dynamic> response = await dio.get<dynamic>('/sessions');
-      final List<dynamic> sessions = (response.data as Map<String, dynamic>)['data'] as List<dynamic>? ?? <dynamic>[];
-
-      if (!mounted) {
-        return;
-      }
-      setState(() {
-        _lastSession = sessions.isNotEmpty ? Map<String, dynamic>.from(sessions.first as Map) : null;
-        _loadingSession = false;
-      });
-    } catch (_) {
-      if (!mounted) {
-        return;
-      }
-      setState(() {
         _lastSession = null;
-        _loadingSession = false;
-      });
-    }
-  }
-
-  Future<void> _loadUserProfile(Dio dio) async {
-    try {
-      final Response<dynamic> response = await dio.get<dynamic>('/auth/me');
-      if (!mounted) {
-        return;
-      }
-      setState(() {
-        _user = Map<String, dynamic>.from((response.data as Map<String, dynamic>)['data'] as Map);
-      });
-    } catch (_) {
-      if (!mounted) {
-        return;
-      }
-      setState(() {
         _user = null;
+        _loadingCategories = false;
+        _loadingSession = false;
+        _isLoading = false;
       });
     }
   }
