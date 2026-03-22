@@ -37,7 +37,7 @@ class ResultScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final int correctAnswers = resultData['correct_answers'] ?? 0;
-    final int totalQuestions = 10;
+    const int totalQuestions = 10;
     final int totalScore = resultData['total_score'] ?? 0;
     final int bonusScore = resultData['bonus_score'] ?? 0;
     final int baseScore = resultData['score'] ?? 0;
@@ -133,7 +133,7 @@ class ResultScreen extends StatelessWidget {
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
             decoration: BoxDecoration(
               color: _neutral,
-              borderRadius: BorderRadius.circular(20),
+              borderRadius: const BorderRadius.all(Radius.circular(20)),
             ),
             child: Text(
               categoryName,
@@ -162,7 +162,7 @@ class ResultScreen extends StatelessWidget {
         padding: const EdgeInsets.all(20),
         decoration: BoxDecoration(
           color: _textDark,
-          borderRadius: BorderRadius.circular(20),
+          borderRadius: const BorderRadius.all(Radius.circular(20)),
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -296,7 +296,7 @@ class ResultScreen extends StatelessWidget {
               decoration: BoxDecoration(
                 color:
                     isCorrect ? const Color(0xFFE8F5E9) : const Color(0xFFFFEBEB),
-                borderRadius: BorderRadius.circular(14),
+                borderRadius: const BorderRadius.all(Radius.circular(14)),
                 border: Border.all(
                   color: isCorrect ? _correct : _incorrect,
                   width: 1,
@@ -443,7 +443,7 @@ class ResultScreen extends StatelessWidget {
               style: ElevatedButton.styleFrom(
                 backgroundColor: _orange,
                 shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(16),
+                  borderRadius: const BorderRadius.all(Radius.circular(16)),
                 ),
                 elevation: 0,
               ),
@@ -478,7 +478,7 @@ class ResultScreen extends StatelessWidget {
                 backgroundColor: _cardBg,
                 side: const BorderSide(color: _neutral, width: 1.5),
                 shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(16),
+                  borderRadius: const BorderRadius.all(Radius.circular(16)),
                 ),
               ),
               child: Row(
