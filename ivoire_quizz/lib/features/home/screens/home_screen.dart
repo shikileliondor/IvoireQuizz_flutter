@@ -76,9 +76,16 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
 
       setState(() {
         if (userData['success'] == true) {
-          _user = Map<String, dynamic>
-            .from(userData['data']);
-        }
+         final userData = results[0].data['data'];
+if (userData is Map) {
+    if (userData.containsKey('user')) {
+        _user = Map<String, dynamic>
+            .from(userData['user']);
+    } else {
+        _user = Map<String, dynamic>
+            .from(userData);
+    }
+}  }
 
         if (categoriesData['success'] == true) {
           final list = categoriesData['data'];
