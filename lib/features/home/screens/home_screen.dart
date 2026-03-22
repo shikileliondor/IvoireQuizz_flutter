@@ -180,38 +180,109 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     }
   }
 
+  Widget _buildSkeleton() {
+    return const Padding(
+      padding: EdgeInsets.all(20),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: <Widget>[
+          SizedBox(height: 16),
+
+          // Header skeleton
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: <Widget>[
+              Row(
+                children: <Widget>[
+                  _SkeletonBox(width: 46, height: 46, radius: 23),
+                  SizedBox(width: 12),
+                  _SkeletonBox(width: 120, height: 18),
+                ],
+              ),
+              _SkeletonBox(width: 90, height: 36, radius: 20),
+            ],
+          ),
+
+          SizedBox(height: 24),
+
+          // Mode picker skeleton
+          Row(
+            children: <Widget>[
+              Expanded(
+                child: _SkeletonBox(
+                  width: double.infinity,
+                  height: 80,
+                  radius: 16,
+                ),
+              ),
+              SizedBox(width: 12),
+              Expanded(
+                child: _SkeletonBox(
+                  width: double.infinity,
+                  height: 80,
+                  radius: 16,
+                ),
+              ),
+            ],
+          ),
+
+          SizedBox(height: 24),
+
+          // Title skeleton
+          _SkeletonBox(width: 160, height: 20),
+          SizedBox(height: 12),
+
+          // Category cards skeleton
+          _SkeletonBox(width: double.infinity, height: 72, radius: 16),
+          SizedBox(height: 12),
+          _SkeletonBox(width: double.infinity, height: 72, radius: 16),
+          SizedBox(height: 12),
+          _SkeletonBox(width: double.infinity, height: 72, radius: 16),
+
+          SizedBox(height: 24),
+
+          // Last session skeleton
+          _SkeletonBox(width: double.infinity, height: 100, radius: 16),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
+    if (_isLoading) {
+      return Scaffold(
+        backgroundColor: Colors.white,
+        body: SafeArea(
+          child: _buildSkeleton(),
+        ),
+      );
+    }
+
     return Scaffold(
       backgroundColor: Colors.white,
       body: SafeArea(
-        child: _isLoading
-            ? const Center(
-                child: CircularProgressIndicator(
-                  color: Color(0xFFF77F00),
-                ),
-              )
-            : RefreshIndicator(
-                color: const Color(0xFFF77F00),
-                onRefresh: _loadData,
-                child: SingleChildScrollView(
-                  physics: const AlwaysScrollableScrollPhysics(),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: <Widget>[
-                      const SizedBox(height: 16),
-                      _buildHeader(),
-                      const SizedBox(height: 20),
-                      _buildModePicker(),
-                      const SizedBox(height: 24),
-                      _buildCategoriesSection(),
-                      const SizedBox(height: 24),
-                      _buildLastSession(),
-                      const SizedBox(height: 20),
-                    ],
-                  ),
-                ),
-              ),
+        child: RefreshIndicator(
+          color: const Color(0xFFF77F00),
+          onRefresh: _loadData,
+          child: SingleChildScrollView(
+            physics: const AlwaysScrollableScrollPhysics(),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: <Widget>[
+                const SizedBox(height: 16),
+                _buildHeader(),
+                const SizedBox(height: 20),
+                _buildModePicker(),
+                const SizedBox(height: 24),
+                _buildCategoriesSection(),
+                const SizedBox(height: 24),
+                _buildLastSession(),
+                const SizedBox(height: 20),
+              ],
+            ),
+          ),
+        ),
       ),
     );
   }
@@ -575,6 +646,67 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
           ),
         ],
       ),
+    );
+  }
+}
+
+class _SkeletonBox extends StatefulWidget {
+  final double width;
+  final double height;
+  final double radius;
+
+  const _SkeletonBox({
+    required this.width,
+    required this.height,
+    this.radius = 8,
+  });
+
+  @override
+  State<_SkeletonBox> createState() => _SkeletonBoxState();
+}
+
+class _SkeletonBoxState extends State<_SkeletonBox> with SingleTickerProviderStateMixin {
+  late AnimationController _controller;
+  late Animation<double> _animation;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(
+      duration: const Duration(milliseconds: 1200),
+      vsync: this,
+    )..repeat(reverse: true);
+    _animation = Tween<double>(
+      begin: 0.4,
+      end: 0.9,
+    ).animate(
+      CurvedAnimation(
+        parent: _controller,
+        curve: Curves.easeInOut,
+      ),
+    );
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedBuilder(
+      animation: _animation,
+      builder: (BuildContext context, Widget? child) {
+        return Container(
+          width: widget.width,
+          height: widget.height,
+          decoration: BoxDecoration(
+            color: const Color(0xFFE5E7EB).withOpacity(_animation.value),
+            borderRadius: BorderRadius.circular(widget.radius),
+          ),
+        );
+      },
     );
   }
 }
