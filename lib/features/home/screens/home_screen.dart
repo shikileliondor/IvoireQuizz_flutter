@@ -380,23 +380,59 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   Widget _buildModePicker() {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 20),
-      child: Row(
+      child: Column(
         children: <Widget>[
-          Expanded(
-            child: _buildModeButton(
-              label: 'Par catégorie',
-              icon: Icons.grid_view_rounded,
-              mode: 'category',
-            ),
+          Row(
+            children: <Widget>[
+              Expanded(
+                child: _buildModeButton(
+                  label: 'Par catégorie',
+                  icon: Icons.grid_view_rounded,
+                  mode: 'category',
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: _buildModeButton(
+                  label: 'Mode mixte',
+                  icon: Icons.shuffle_rounded,
+                  mode: 'mixed',
+                ),
+              ),
+            ],
           ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: _buildModeButton(
-              label: 'Mode mixte',
-              icon: Icons.shuffle_rounded,
-              mode: 'mixed',
+          if (_selectedMode == 'mixed') ...<Widget>[
+            const SizedBox(height: 12),
+            SizedBox(
+              width: double.infinity,
+              height: 56,
+              child: ElevatedButton(
+                onPressed: () => context.push('/quiz/null/mixed'),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFFF77F00),
+                  foregroundColor: Colors.white,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(14),
+                  ),
+                  elevation: 0,
+                ),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: <Widget>[
+                    const Icon(Icons.shuffle_rounded, color: Colors.white),
+                    const SizedBox(width: 8),
+                    Text(
+                      'Lancer le mode mixte',
+                      style: GoogleFonts.nunito(
+                        fontWeight: FontWeight.w700,
+                        color: Colors.white,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
             ),
-          ),
+          ],
         ],
       ),
     );
@@ -487,7 +523,13 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
               final ({Color bgColor, Color iconColor, IconData icon}) style = _getCategoryStyle(index);
 
               return GestureDetector(
-                onTap: () => context.push('/quiz/${category['id']}/$_selectedMode'),
+                onTap: () {
+                  if (_selectedMode == 'mixed') {
+                    context.push('/quiz/null/mixed');
+                    return;
+                  }
+                  context.push('/quiz/${category['id']}/$_selectedMode');
+                },
                 child: Container(
                   padding: const EdgeInsets.all(16),
                   decoration: BoxDecoration(
