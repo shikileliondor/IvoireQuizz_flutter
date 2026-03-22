@@ -201,7 +201,7 @@ class _AuthScreenState extends State<AuthScreen>
 
     try {
       final googleSignIn = GoogleSignIn(
-        scopes: ['email', 'profile'],
+        scopes: const <String>['email', 'profile'],
       );
       final account = await googleSignIn.signIn();
       if (account == null) {
@@ -250,7 +250,7 @@ class _AuthScreenState extends State<AuthScreen>
       body: Stack(
         children: [
           CustomPaint(
-            painter: _KentePatternPainter(),
+            painter: const _KentePatternPainter(),
             child: const SizedBox.expand(),
           ),
           SafeArea(
@@ -267,10 +267,10 @@ class _AuthScreenState extends State<AuthScreen>
                         height: 48,
                         decoration: BoxDecoration(
                           color: const Color(0xFFF77F00),
-                          borderRadius: BorderRadius.circular(14),
+                          borderRadius: const BorderRadius.all(Radius.circular(14)),
                         ),
                         child: ClipRRect(
-                          borderRadius: BorderRadius.circular(14),
+                          borderRadius: const BorderRadius.all(Radius.circular(14)),
                           child: Image.asset(
                             'assets/images/ivoire Quizz.png',
                             fit: BoxFit.cover,
@@ -302,13 +302,13 @@ class _AuthScreenState extends State<AuthScreen>
                     height: 48,
                     decoration: BoxDecoration(
                       color: const Color(0xFFF8F9FA),
-                      borderRadius: BorderRadius.circular(14),
+                      borderRadius: const BorderRadius.all(Radius.circular(14)),
                     ),
                     child: TabBar(
                       controller: _tabController,
                       indicator: BoxDecoration(
                         color: const Color(0xFFF77F00),
-                        borderRadius: BorderRadius.circular(12),
+                        borderRadius: const BorderRadius.all(Radius.circular(12)),
                       ),
                       indicatorSize: TabBarIndicatorSize.tab,
                       dividerColor: Colors.transparent,
@@ -357,7 +357,7 @@ class _AuthScreenState extends State<AuthScreen>
         style: OutlinedButton.styleFrom(
           side: const BorderSide(color: Color(0xFFE5E7EB), width: 1.5),
           shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(14),
+            borderRadius: const BorderRadius.all(Radius.circular(14)),
           ),
           backgroundColor: Colors.white,
         ),
@@ -464,19 +464,19 @@ class _AuthScreenState extends State<AuthScreen>
             filled: true,
             fillColor: const Color(0xFFF8F9FA),
             border: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(14),
+              borderRadius: const BorderRadius.all(Radius.circular(14)),
               borderSide: const BorderSide(
                 color: Color(0xFFE5E7EB),
               ),
             ),
             enabledBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(14),
+              borderRadius: const BorderRadius.all(Radius.circular(14)),
               borderSide: const BorderSide(
                 color: Color(0xFFE5E7EB),
               ),
             ),
             focusedBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(14),
+              borderRadius: const BorderRadius.all(Radius.circular(14)),
               borderSide: const BorderSide(
                 color: Color(0xFFF77F00),
                 width: 2,
@@ -499,7 +499,7 @@ class _AuthScreenState extends State<AuthScreen>
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
         color: const Color(0xFFFFEBEB),
-        borderRadius: BorderRadius.circular(10),
+        borderRadius: const BorderRadius.all(Radius.circular(10)),
         border: Border.all(color: const Color(0xFFEF4444)),
       ),
       child: Row(
@@ -580,7 +580,7 @@ class _AuthScreenState extends State<AuthScreen>
             style: ElevatedButton.styleFrom(
               backgroundColor: const Color(0xFFF77F00),
               shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(16),
+                borderRadius: const BorderRadius.all(Radius.circular(16)),
               ),
               elevation: 0,
             ),
@@ -640,7 +640,7 @@ class _AuthScreenState extends State<AuthScreen>
             style: ElevatedButton.styleFrom(
               backgroundColor: const Color(0xFFF77F00),
               shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(16),
+                borderRadius: const BorderRadius.all(Radius.circular(16)),
               ),
               elevation: 0,
             ),
@@ -665,6 +665,8 @@ class _AuthScreenState extends State<AuthScreen>
 }
 
 class _KentePatternPainter extends CustomPainter {
+  const _KentePatternPainter();
+
   @override
   void paint(Canvas canvas, Size size) {
     final paint = Paint()

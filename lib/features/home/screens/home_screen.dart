@@ -338,7 +338,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
             decoration: BoxDecoration(
               color: const Color(0xFFFFD700),
-              borderRadius: BorderRadius.circular(20),
+              borderRadius: const BorderRadius.all(Radius.circular(20)),
             ),
             child: Row(
               children: <Widget>[
@@ -404,7 +404,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
         height: 80,
         decoration: BoxDecoration(
           color: isSelected ? const Color(0xFFF77F00) : Colors.white,
-          borderRadius: BorderRadius.circular(16),
+          borderRadius: const BorderRadius.all(Radius.circular(16)),
           border: isSelected ? null : Border.all(color: AppColors.neutral, width: 1.5),
           boxShadow: isSelected
               ? <BoxShadow>[
@@ -478,7 +478,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                   padding: const EdgeInsets.all(16),
                   decoration: BoxDecoration(
                     color: style.bgColor,
-                    borderRadius: BorderRadius.circular(16),
+                    borderRadius: const BorderRadius.all(Radius.circular(16)),
                   ),
                   child: Row(
                     children: <Widget>[
@@ -487,7 +487,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                         height: 44,
                         decoration: BoxDecoration(
                           color: Colors.white.withOpacity(0.6),
-                          borderRadius: BorderRadius.circular(10),
+                          borderRadius: const BorderRadius.all(Radius.circular(10)),
                         ),
                         child: Icon(
                           style.icon,
@@ -558,7 +558,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: const BorderRadius.all(Radius.circular(16)),
         border: Border.all(color: AppColors.neutral),
         boxShadow: <BoxShadow>[
           BoxShadow(
@@ -601,7 +601,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                 height: 36,
                 decoration: BoxDecoration(
                   color: const Color(0xFFFFF3E8),
-                  borderRadius: BorderRadius.circular(8),
+                  borderRadius: const BorderRadius.all(Radius.circular(8)),
                 ),
                 child: const Icon(
                   Icons.menu_book_rounded,

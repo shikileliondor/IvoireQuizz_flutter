@@ -73,8 +73,8 @@ class _QuizScreenState extends State<QuizScreen> {
 
       final dio = Dio(BaseOptions(
         baseUrl: 'http://10.0.2.2:8000/api',
-        connectTimeout: Duration(seconds: 10),
-        receiveTimeout: Duration(seconds: 10),
+        connectTimeout: const Duration(seconds: 10),
+        receiveTimeout: const Duration(seconds: 10),
         headers: {
           'Accept': 'application/json',
           'Content-Type': 'application/json',
@@ -195,8 +195,8 @@ class _QuizScreenState extends State<QuizScreen> {
         .read(key: 'auth_token');
       final dio = Dio(BaseOptions(
         baseUrl: 'http://10.0.2.2:8000/api',
-        connectTimeout: Duration(seconds: 10),
-        receiveTimeout: Duration(seconds: 10),
+        connectTimeout: const Duration(seconds: 10),
+        receiveTimeout: const Duration(seconds: 10),
         headers: {
           'Accept': 'application/json',
           'Content-Type': 'application/json',
@@ -258,7 +258,7 @@ class _QuizScreenState extends State<QuizScreen> {
         horizontal: 10, vertical: 4),
       decoration: BoxDecoration(
         color: bgColor,
-        borderRadius: BorderRadius.circular(20),
+        borderRadius: const BorderRadius.all(Radius.circular(20)),
       ),
       child: Text(label,
         style: GoogleFonts.nunito(
@@ -280,7 +280,7 @@ class _QuizScreenState extends State<QuizScreen> {
             width: 36, height: 36,
             decoration: BoxDecoration(
               color: _cardBg,
-              borderRadius: BorderRadius.circular(10),
+              borderRadius: const BorderRadius.all(Radius.circular(10)),
               border: Border.all(color: _neutral),
             ),
             child: const Icon(Icons.close_rounded,
@@ -290,7 +290,7 @@ class _QuizScreenState extends State<QuizScreen> {
         const SizedBox(width: 12),
         Expanded(
           child: ClipRRect(
-            borderRadius: BorderRadius.circular(4),
+            borderRadius: const BorderRadius.all(Radius.circular(4)),
             child: LinearProgressIndicator(
               value: _questions.isEmpty ? 0 :
                 (_currentIndex + 1) /
@@ -310,7 +310,7 @@ class _QuizScreenState extends State<QuizScreen> {
           decoration: BoxDecoration(
             color: _timeLeft <= 5
               ? const Color(0xFFFFEBEB) : _cardBg,
-            borderRadius: BorderRadius.circular(20),
+            borderRadius: const BorderRadius.all(Radius.circular(20)),
             border: Border.all(
               color: _timeLeft <= 5
                 ? _incorrect : _neutral),
@@ -362,7 +362,7 @@ class _QuizScreenState extends State<QuizScreen> {
             padding: const EdgeInsets.all(20),
             decoration: BoxDecoration(
               color: _cardBg,
-              borderRadius: BorderRadius.circular(16),
+              borderRadius: const BorderRadius.all(Radius.circular(16)),
               border: Border.all(color: _neutral),
             ),
             child: Column(
@@ -401,7 +401,7 @@ class _QuizScreenState extends State<QuizScreen> {
                 color: _isCorrectAnswer
                   ? const Color(0xFFE8F5E9)
                   : const Color(0xFFFFEBEB),
-                borderRadius: BorderRadius.circular(12),
+                borderRadius: const BorderRadius.all(Radius.circular(12)),
                 border: Border.all(
                   color: _isCorrectAnswer
                     ? _correct : _incorrect),

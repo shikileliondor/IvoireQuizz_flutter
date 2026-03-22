@@ -58,7 +58,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
       body: Stack(
         children: [
           CustomPaint(
-            painter: KentePatternPainter(),
+            painter: const KentePatternPainter(),
             size: Size.infinite,
           ),
           SafeArea(
@@ -374,7 +374,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                 style: ElevatedButton.styleFrom(
                   backgroundColor: _orange,
                   shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(16),
+                    borderRadius: const BorderRadius.all(Radius.circular(16)),
                   ),
                 ),
                 child: Text(
@@ -398,7 +398,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                     style: ElevatedButton.styleFrom(
                       backgroundColor: _orange,
                       shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(16),
+                        borderRadius: const BorderRadius.all(Radius.circular(16)),
                       ),
                     ),
                     child: Text(
@@ -456,7 +456,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
           height: 8,
           decoration: BoxDecoration(
             color: _currentPage == i ? _orange : const Color(0xFFE5E7EB),
-            borderRadius: BorderRadius.circular(4),
+            borderRadius: const BorderRadius.all(Radius.circular(4)),
           ),
         ),
       ),
@@ -472,7 +472,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
         color: bgColor,
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: const BorderRadius.all(Radius.circular(12)),
         boxShadow: [
           BoxShadow(
             color: Colors.black.withOpacity(0.08),
@@ -490,7 +490,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
       decoration: BoxDecoration(
         color: _cardBg,
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: const BorderRadius.all(Radius.circular(12)),
         border: Border.all(
           color: const Color(0xFFE5E7EB),
           width: 1,
@@ -574,6 +574,8 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
 }
 
 class KentePatternPainter extends CustomPainter {
+  const KentePatternPainter();
+
   @override
   void paint(Canvas canvas, Size size) {
     const diamondWidth = 16.0;
