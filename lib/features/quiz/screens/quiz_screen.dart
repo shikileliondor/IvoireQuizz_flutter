@@ -5,6 +5,7 @@ import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 const _orange    = Color(0xFFF77F00);
 const _textDark  = Color(0xFF1A1A2E);
@@ -217,6 +218,10 @@ class _QuizScreenState extends State<QuizScreen> {
       );
       debugPrint('SESSION: ${response.data}');
       if (response.data['success'] == true) {
+        final prefs = await SharedPreferences
+          .getInstance();
+        await prefs.remove('home_cache');
+        debugPrint('Cache Home invalidé');
         if (mounted) {
           context.go('/result',
             extra: response.data['data']);
