@@ -24,7 +24,8 @@ class QuizScreen extends StatefulWidget {
   });
 
   @override
-  State<QuizScreen> createState() => _QuizScreenState();
+  State<QuizScreen> createState() =>
+    _QuizScreenState();
 }
 
 class _QuizScreenState extends State<QuizScreen> {
@@ -59,8 +60,9 @@ class _QuizScreenState extends State<QuizScreen> {
       final token = await _storage
         .read(key: 'auth_token');
 
-      debugPrint('TOKEN QUIZ: $token');
-      debugPrint('CATEGORY ID: ${widget.categoryId}');
+      debugPrint('=== QUIZ DEBUG ===');
+      debugPrint('TOKEN: $token');
+      debugPrint('CATEGORY: ${widget.categoryId}');
       debugPrint('MODE: ${widget.mode}');
 
       if (token == null) {
@@ -70,8 +72,8 @@ class _QuizScreenState extends State<QuizScreen> {
 
       final dio = Dio(BaseOptions(
         baseUrl: 'http://10.0.2.2:8000/api',
-        connectTimeout: const Duration(seconds: 10),
-        receiveTimeout: const Duration(seconds: 10),
+        connectTimeout: Duration(seconds: 10),
+        receiveTimeout: Duration(seconds: 10),
         headers: {
           'Accept': 'application/json',
           'Content-Type': 'application/json',
@@ -79,41 +81,36 @@ class _QuizScreenState extends State<QuizScreen> {
         },
       ));
 
-      final Map<String, dynamic> queryParams = {
+      final Map<String,dynamic> params = {
         'mode': widget.mode,
       };
-
       if (widget.categoryId != null) {
-        queryParams['category_id'] =
+        params['category_id'] =
           widget.categoryId.toString();
       }
 
-      debugPrint('URL QUIZ: /quiz/questions');
-      debugPrint('PARAMS: $queryParams');
+      debugPrint('PARAMS: $params');
 
       final response = await dio.get(
         '/quiz/questions',
-        queryParameters: queryParams,
+        queryParameters: params,
       );
 
-      debugPrint('RÉPONSE QUIZ: ${response.data}');
+      debugPrint('STATUS: ${response.statusCode}');
+      debugPrint('DATA: ${response.data}');
 
       if (response.data['success'] == true) {
         final list = response.data['data'] as List;
-        debugPrint('QUESTIONS COUNT: ${list.length}');
+        debugPrint('QUESTIONS: ${list.length}');
         setState(() {
-          _questions = list
-            .map((e) => Map<String,dynamic>.from(e))
-            .toList();
+          _questions = list.map((e) =>
+            Map<String,dynamic>.from(e)).toList();
           _isLoading = false;
         });
         _startTimer();
-      } else {
-        debugPrint('API ERROR: ${response.data}');
-        setState(() => _isLoading = false);
       }
     } on DioException catch (e) {
-      debugPrint('ERREUR DIO QUIZ: ${e.message}');
+      debugPrint('DIO ERROR: ${e.message}');
       debugPrint('STATUS: ${e.response?.statusCode}');
       debugPrint('DATA: ${e.response?.data}');
       if (e.response?.statusCode == 401) {
@@ -123,7 +120,7 @@ class _QuizScreenState extends State<QuizScreen> {
       }
       setState(() => _isLoading = false);
     } catch (e) {
-      debugPrint('ERREUR GÉNÉRALE QUIZ: $e');
+      debugPrint('ERROR: $e');
       setState(() => _isLoading = false);
     }
   }
@@ -186,8 +183,8 @@ class _QuizScreenState extends State<QuizScreen> {
         .read(key: 'auth_token');
       final dio = Dio(BaseOptions(
         baseUrl: 'http://10.0.2.2:8000/api',
-        connectTimeout: const Duration(seconds: 10),
-        receiveTimeout: const Duration(seconds: 10),
+        connectTimeout: Duration(seconds: 10),
+        receiveTimeout: Duration(seconds: 10),
         headers: {
           'Accept': 'application/json',
           'Content-Type': 'application/json',
@@ -206,6 +203,7 @@ class _QuizScreenState extends State<QuizScreen> {
           'answers': _answers,
         },
       );
+      debugPrint('SESSION: ${response.data}');
       if (response.data['success'] == true) {
         if (mounted) {
           context.go('/result',
@@ -213,11 +211,7 @@ class _QuizScreenState extends State<QuizScreen> {
         }
       }
     } catch (e) {
-      debugPrint('ERREUR SUBMIT: $e');
-      if (e is DioException) {
-        debugPrint('Status: ${e.response?.statusCode}');
-        debugPrint('Data: ${e.response?.data}');
-      }
+      debugPrint('SUBMIT ERROR: $e');
       setState(() => _isSubmitting = false);
     }
   }
@@ -277,8 +271,7 @@ class _QuizScreenState extends State<QuizScreen> {
               borderRadius: BorderRadius.circular(10),
               border: Border.all(color: _neutral),
             ),
-            child: const Icon(
-              Icons.close_rounded,
+            child: const Icon(Icons.close_rounded,
               color: _textGray, size: 20),
           ),
         ),
@@ -291,8 +284,8 @@ class _QuizScreenState extends State<QuizScreen> {
                 (_currentIndex + 1) /
                 _questions.length,
               backgroundColor: _neutral,
-              valueColor:
-                const AlwaysStoppedAnimation(_orange),
+              valueColor: const AlwaysStoppedAnimation(
+                _orange),
               minHeight: 8,
             ),
           ),
