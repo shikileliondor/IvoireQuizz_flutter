@@ -33,6 +33,7 @@ class _QuizScreenState extends State<QuizScreen> {
   int _currentIndex = 0;
   int? _selectedOptionId;
   bool _answered = false;
+  bool _isCorrectAnswer = false;
   bool _isLoading = true;
   bool _isSubmitting = false;
   int _timeLeft = 20;
@@ -147,9 +148,19 @@ class _QuizScreenState extends State<QuizScreen> {
     _stopTimer();
     final responseTime = 20 - _timeLeft;
     final question = _questions[_currentIndex];
+    bool isCorrect = false;
+    if (optionId != null) {
+      final options = question['options'] as List;
+      final selected = options.firstWhere(
+        (o) => o['id'] == optionId,
+        orElse: () => <String, dynamic>{},
+      );
+      isCorrect = selected['is_correct'] == true;
+    }
     setState(() {
       _selectedOptionId = optionId;
       _answered = true;
+      _isCorrectAnswer = isCorrect;
     });
     _answers.add({
       'question_id': question['id'],
@@ -168,6 +179,7 @@ class _QuizScreenState extends State<QuizScreen> {
         _currentIndex++;
         _selectedOptionId = null;
         _answered = false;
+        _isCorrectAnswer = false;
         _timeLeft = 20;
       });
       _startTimer();
@@ -324,6 +336,14 @@ class _QuizScreenState extends State<QuizScreen> {
 
   Widget _buildQuestion() {
     final question = _questions[_currentIndex];
+    final options = question['options'] as List;
+    final correctOption = options.firstWhere(
+      (o) => o['is_correct'] == true,
+      orElse: () => <String, dynamic>{
+        'option_text': '',
+      },
+    );
+    final correctText = correctOption['option_text'] ?? '';
     return SingleChildScrollView(
       padding: const EdgeInsets.symmetric(
         horizontal: 20),
@@ -378,25 +398,82 @@ class _QuizScreenState extends State<QuizScreen> {
             Container(
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
-                color: const Color(0xFFE8F5E9),
+                color: _isCorrectAnswer
+                  ? const Color(0xFFE8F5E9)
+                  : const Color(0xFFFFEBEB),
                 borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: _correct),
+                border: Border.all(
+                  color: _isCorrectAnswer
+                    ? _correct : _incorrect),
               ),
               child: Row(
                 crossAxisAlignment:
                   CrossAxisAlignment.start,
                 children: [
-                  const Icon(Icons.lightbulb_outline,
-                    color: _correct, size: 18),
+                  Icon(
+                    _isCorrectAnswer
+                      ? Icons.check_circle_outline
+                      : Icons.cancel_outlined,
+                    color: _isCorrectAnswer
+                      ? _correct : _incorrect,
+                    size: 18,
+                  ),
                   const SizedBox(width: 8),
                   Expanded(
-                    child: Text(
-                      question['explanation'] ?? '',
-                      style: GoogleFonts.nunito(
-                        fontSize: 13,
-                        color: _textDark,
-                        height: 1.5,
-                      ))),
+                    child: Column(
+                      crossAxisAlignment:
+                        CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          _isCorrectAnswer
+                            ? 'Bonne réponse ! +points'
+                            : 'Mauvaise réponse',
+                          style: GoogleFonts.nunito(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w700,
+                            color: _isCorrectAnswer
+                              ? _correct : _incorrect,
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        if (!_isCorrectAnswer) ...[
+                          RichText(
+                            text: TextSpan(
+                              style: GoogleFonts.nunito(
+                                fontSize: 13,
+                                color: _textDark,
+                              ),
+                              children: [
+                                const TextSpan(
+                                  text: 'Bonne réponse : ',
+                                ),
+                                TextSpan(
+                                  text: '$correctText',
+                                  style:
+                                    GoogleFonts.nunito(
+                                    fontSize: 13,
+                                    fontWeight:
+                                      FontWeight.w600,
+                                    color: _textDark,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          const SizedBox(height: 4),
+                        ],
+                        Text(
+                          question['explanation'] ?? '',
+                          style: GoogleFonts.nunito(
+                            fontSize: 13,
+                            color: _isCorrectAnswer
+                              ? _textDark : _textGray,
+                            height: 1.5,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
                 ],
               ),
             ).animate()
@@ -423,8 +500,66 @@ class _QuizScreenState extends State<QuizScreen> {
           final optionId = option['id'] as int;
           final isSelected =
             _selectedOptionId == optionId;
+          final isCorrectOption =
+            option['is_correct'] == true;
+          final isWrongSelected =
+            isSelected && !isCorrectOption;
+          final isRightOption =
+            isCorrectOption && _answered;
           final isNotSelected =
-            _answered && !isSelected;
+            _answered && !isSelected &&
+            !isRightOption;
+
+          Color bgColor;
+          Color borderColor;
+          Color circleColor;
+          Color letterColor;
+          Widget? trailingIcon;
+
+          if (_answered) {
+            if (isRightOption) {
+              bgColor = const Color(0xFFE8F5E9);
+              borderColor = const Color(0xFF22C55E);
+              circleColor = const Color(0xFF22C55E);
+              letterColor = Colors.white;
+              trailingIcon = const Icon(
+                Icons.check_circle_rounded,
+                color: Color(0xFF22C55E),
+                size: 22,
+              );
+            } else if (isWrongSelected) {
+              bgColor = const Color(0xFFFFEBEB);
+              borderColor = const Color(0xFFEF4444);
+              circleColor = const Color(0xFFEF4444);
+              letterColor = Colors.white;
+              trailingIcon = const Icon(
+                Icons.cancel_rounded,
+                color: Color(0xFFEF4444),
+                size: 22,
+              );
+            } else {
+              bgColor = Colors.white;
+              borderColor = _neutral;
+              circleColor = _cardBg;
+              letterColor = _textGray;
+              trailingIcon = null;
+            }
+          } else {
+            bgColor = isSelected
+              ? const Color(0xFFFFF3E8)
+              : Colors.white;
+            borderColor = isSelected ? _orange : _neutral;
+            circleColor = isSelected ? _orange : _cardBg;
+            letterColor = isSelected ? Colors.white : _textGray;
+            trailingIcon = isSelected
+              ? const Icon(
+                  Icons.radio_button_checked,
+                  color: _orange,
+                  size: 20,
+                )
+              : null;
+          }
+
           return Padding(
             padding: const EdgeInsets.only(bottom: 10),
             child: GestureDetector(
@@ -434,22 +569,23 @@ class _QuizScreenState extends State<QuizScreen> {
               child: AnimatedOpacity(
                 duration:
                   const Duration(milliseconds: 300),
-                opacity: isNotSelected ? 0.5 : 1.0,
+                opacity: isNotSelected ? 0.4 : 1.0,
                 child: AnimatedContainer(
                   duration:
                     const Duration(milliseconds: 300),
                   width: double.infinity,
                   padding: const EdgeInsets.all(16),
                   decoration: BoxDecoration(
-                    color: isSelected
-                      ? const Color(0xFFFFF3E8)
-                      : Colors.white,
+                    color: bgColor,
                     borderRadius:
                       BorderRadius.circular(14),
                     border: Border.all(
-                      color: isSelected
-                        ? _orange : _neutral,
-                      width: isSelected ? 2 : 1,
+                      color: borderColor,
+                      width: (_answered && isRightOption) ||
+                          (_answered && isWrongSelected) ||
+                          (!_answered && isSelected)
+                        ? 2
+                        : 1,
                     ),
                   ),
                   child: Row(children: [
@@ -457,11 +593,9 @@ class _QuizScreenState extends State<QuizScreen> {
                       width: 28, height: 28,
                       decoration: BoxDecoration(
                         shape: BoxShape.circle,
-                        color: isSelected
-                          ? _orange : _cardBg,
+                        color: circleColor,
                         border: Border.all(
-                          color: isSelected
-                            ? _orange : _neutral),
+                          color: borderColor),
                       ),
                       child: Center(
                         child: Text(
@@ -470,9 +604,7 @@ class _QuizScreenState extends State<QuizScreen> {
                           style: GoogleFonts.nunito(
                             fontSize: 13,
                             fontWeight: FontWeight.w700,
-                            color: isSelected
-                              ? Colors.white
-                              : _textGray,
+                            color: letterColor,
                           ))),
                     ),
                     const SizedBox(width: 12),
@@ -484,10 +616,7 @@ class _QuizScreenState extends State<QuizScreen> {
                           fontWeight: FontWeight.w600,
                           color: _textDark,
                         ))),
-                    if (isSelected)
-                      const Icon(
-                        Icons.radio_button_checked,
-                        color: _orange, size: 20),
+                    if (trailingIcon != null) trailingIcon,
                   ]),
                 ),
               ),
