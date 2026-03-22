@@ -1,9 +1,12 @@
+import 'dart:convert';
+
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../../core/theme/app_theme.dart';
 
@@ -23,7 +26,6 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   bool _loadingCategories = true;
   bool _loadingSession = true;
 
-  final FlutterSecureStorage _storage = const FlutterSecureStorage();
 
   @override
   void initState() {
@@ -32,94 +34,86 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   }
 
   Future<void> _loadData() async {
-    setState(() => _isLoading = true);
-    
-    try {
-      final token = await const FlutterSecureStorage()
-        .read(key: 'auth_token');
+    // ÉTAPE 1 : Afficher le cache immédiatement
+    await _loadFromCache();
 
-      debugPrint('TOKEN: $token');
+    // ÉTAPE 2 : Charger depuis l'API en arrière-plan
+    await _loadFromApi();
+  }
+
+  Future<void> _loadFromCache() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final cached = prefs.getString('home_cache');
+      if (cached != null) {
+        final data = jsonDecode(cached) as Map<String, dynamic>;
+        setState(() {
+          _user = data['user'] != null ? Map<String, dynamic>.from(data['user']) : null;
+          _categories = data['categories'] != null
+              ? List<Map<String, dynamic>>.from(
+                  (data['categories'] as List).map((e) => Map<String, dynamic>.from(e)),
+                )
+              : <Map<String, dynamic>>[];
+          _lastSession = data['last_session'] != null ? Map<String, dynamic>.from(data['last_session']) : null;
+          _loadingCategories = false;
+          _loadingSession = false;
+          _isLoading = _user == null;
+        });
+      }
+    } catch (e) {
+      debugPrint('CACHE ERROR: $e');
+    }
+  }
+
+  Future<void> _loadFromApi() async {
+    try {
+      final token = await const FlutterSecureStorage().read(key: 'auth_token');
 
       if (token == null) {
         if (mounted) context.go('/auth');
         return;
       }
 
-      final dio = Dio(BaseOptions(
-        baseUrl: 'http://10.0.2.2:8000/api',
-        connectTimeout: const Duration(seconds: 10),
-        receiveTimeout: const Duration(seconds: 10),
-        headers: {
-          'Accept': 'application/json',
-          'Content-Type': 'application/json',
-          'Authorization': 'Bearer $token',
-        },
-      ));
+      final dio = Dio(
+        BaseOptions(
+          baseUrl: 'http://10.0.2.2:8000/api',
+          connectTimeout: const Duration(seconds: 10),
+          receiveTimeout: const Duration(seconds: 10),
+          headers: {
+            'Accept': 'application/json',
+            'Content-Type': 'application/json',
+            'Authorization': 'Bearer $token',
+          },
+        ),
+      );
 
-      debugPrint('Appel API en cours...');
+      final response = await dio.get('/home');
 
-      final results = await Future.wait([
-        dio.get('/auth/me'),
-        dio.get('/categories'),
-        dio.get('/sessions'),
-      ]);
+      if (response.data['success'] == true) {
+        final data = response.data['data'] as Map<String, dynamic>;
 
-      debugPrint('Réponse /auth/me : ${results[0].data}');
-      debugPrint('Réponse /categories : ${results[1].data}');
-      debugPrint('Réponse /sessions : ${results[2].data}');
+        // Sauvegarder en cache
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.setString('home_cache', jsonEncode(data));
 
-      if (!mounted) return;
-      
-      final userData = results[0].data;
-      final categoriesData = results[1].data;
-      final sessionsData = results[2].data;
-
-      setState(() {
-        if (userData['success'] == true) {
-         final userData = results[0].data['data'];
-if (userData is Map) {
-    if (userData.containsKey('user')) {
-        _user = Map<String, dynamic>
-            .from(userData['user']);
-    } else {
-        _user = Map<String, dynamic>
-            .from(userData);
-    }
-}  }
-
-        if (categoriesData['success'] == true) {
-          final list = categoriesData['data'];
-          if (list is List) {
-            _categories = list
-              .map((e) => Map<String, dynamic>.from(e))
-              .toList();
-          }
-        }
-
-        if (sessionsData['success'] == true) {
-          final sessions = sessionsData['data'];
-          if (sessions is List && sessions.isNotEmpty) {
-            _lastSession = Map<String, dynamic>
-              .from(sessions[0]);
-          }
-        }
-
-        _loadingCategories = false;
-        _loadingSession = false;
-        _isLoading = false;
-      });
-
-      debugPrint('Categories chargées: ${_categories.length}');
-      debugPrint('User: ${_user?['name']}');
-
+        if (!mounted) return;
+        setState(() {
+          _user = data['user'] != null ? Map<String, dynamic>.from(data['user']) : null;
+          _categories = data['categories'] != null
+              ? List<Map<String, dynamic>>.from(
+                  (data['categories'] as List).map((e) => Map<String, dynamic>.from(e)),
+                )
+              : <Map<String, dynamic>>[];
+          _lastSession = data['last_session'] != null ? Map<String, dynamic>.from(data['last_session']) : null;
+          _loadingCategories = false;
+          _loadingSession = false;
+          _isLoading = false;
+        });
+      }
     } on DioException catch (e) {
-      debugPrint('ERREUR DIO: ${e.message}');
-      debugPrint('Status: ${e.response?.statusCode}');
-      debugPrint('Data: ${e.response?.data}');
-      
+      debugPrint('API ERROR: $e');
       if (e.response?.statusCode == 401) {
-        await const FlutterSecureStorage()
-          .delete(key: 'auth_token');
+        await const FlutterSecureStorage().delete(key: 'auth_token');
         if (mounted) context.go('/auth');
         return;
       }
@@ -131,7 +125,7 @@ if (userData is Map) {
         });
       }
     } catch (e) {
-      debugPrint('ERREUR GÉNÉRALE: $e');
+      debugPrint('ERROR: $e');
       if (mounted) {
         setState(() {
           _loadingCategories = false;
