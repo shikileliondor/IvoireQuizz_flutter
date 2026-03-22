@@ -84,39 +84,33 @@ class SplashScreen extends StatefulWidget {
 }
 
 class _SplashScreenState extends State<SplashScreen> {
-  final FlutterSecureStorage _storage = const FlutterSecureStorage();
-
   @override
   void initState() {
     super.initState();
-    _navigate();
+    _checkAuth();
   }
 
-  Future<void> _navigate() async {
+  Future<void> _checkAuth() async {
     await Future<void>.delayed(const Duration(seconds: 2));
-    final String? token = await _storage.read(key: 'auth_token');
-
     if (!mounted) {
       return;
     }
 
-    if (token != null && token.isNotEmpty) {
+    const FlutterSecureStorage storage = FlutterSecureStorage();
+
+    // TEMP: décommenter pour reset les tests
+    // await storage.deleteAll();
+
+    final String? token = await storage.read(key: 'auth_token');
+    final String? onboardingDone = await storage.read(key: 'onboarding_done');
+
+    if (token != null) {
       context.go('/home');
-      return;
-    }
-
-    final String? onboardingDone = await _storage.read(key: 'onboarding_done');
-
-    if (!mounted) {
-      return;
-    }
-
-    if (onboardingDone == null) {
+    } else if (onboardingDone == null) {
       context.go('/onboarding');
-      return;
+    } else {
+      context.go('/auth');
     }
-
-    context.go('/auth');
   }
 
   @override
