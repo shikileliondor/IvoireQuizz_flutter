@@ -15,7 +15,7 @@ const _correct   = Color(0xFF22C55E);
 const _incorrect = Color(0xFFEF4444);
 
 class QuizScreen extends StatefulWidget {
-  final String? categoryId;
+  final int? categoryId;
   final String mode;
   const QuizScreen({
     super.key,
@@ -58,6 +58,16 @@ class _QuizScreenState extends State<QuizScreen> {
     try {
       final token = await _storage
         .read(key: 'auth_token');
+
+      debugPrint('TOKEN QUIZ: $token');
+      debugPrint('CATEGORY ID: ${widget.categoryId}');
+      debugPrint('MODE: ${widget.mode}');
+
+      if (token == null) {
+        if (mounted) context.go('/auth');
+        return;
+      }
+
       final dio = Dio(BaseOptions(
         baseUrl: 'http://10.0.2.2:8000/api',
         connectTimeout: const Duration(seconds: 10),
@@ -68,14 +78,29 @@ class _QuizScreenState extends State<QuizScreen> {
           'Authorization': 'Bearer $token',
         },
       ));
-      String url = 
-        '/quiz/questions?mode=${widget.mode}';
+
+      final Map<String, dynamic> queryParams = {
+        'mode': widget.mode,
+      };
+
       if (widget.categoryId != null) {
-        url += '&category_id=${widget.categoryId}';
+        queryParams['category_id'] =
+          widget.categoryId.toString();
       }
-      final response = await dio.get(url);
+
+      debugPrint('URL QUIZ: /quiz/questions');
+      debugPrint('PARAMS: $queryParams');
+
+      final response = await dio.get(
+        '/quiz/questions',
+        queryParameters: queryParams,
+      );
+
+      debugPrint('RÉPONSE QUIZ: ${response.data}');
+
       if (response.data['success'] == true) {
         final list = response.data['data'] as List;
+        debugPrint('QUESTIONS COUNT: ${list.length}');
         setState(() {
           _questions = list
             .map((e) => Map<String,dynamic>.from(e))
@@ -83,9 +108,22 @@ class _QuizScreenState extends State<QuizScreen> {
           _isLoading = false;
         });
         _startTimer();
+      } else {
+        debugPrint('API ERROR: ${response.data}');
+        setState(() => _isLoading = false);
       }
+    } on DioException catch (e) {
+      debugPrint('ERREUR DIO QUIZ: ${e.message}');
+      debugPrint('STATUS: ${e.response?.statusCode}');
+      debugPrint('DATA: ${e.response?.data}');
+      if (e.response?.statusCode == 401) {
+        await _storage.delete(key: 'auth_token');
+        if (mounted) context.go('/auth');
+        return;
+      }
+      setState(() => _isLoading = false);
     } catch (e) {
-      debugPrint('ERREUR QUIZ: $e');
+      debugPrint('ERREUR GÉNÉRALE QUIZ: $e');
       setState(() => _isLoading = false);
     }
   }
@@ -162,9 +200,7 @@ class _QuizScreenState extends State<QuizScreen> {
       final response = await dio.post(
         '/sessions',
         data: {
-          'category_id': widget.categoryId != null
-            ? int.tryParse(widget.categoryId!)
-            : null,
+          'category_id': widget.categoryId,
           'mode': widget.mode,
           'duration_seconds': durationSeconds,
           'answers': _answers,
