@@ -48,13 +48,28 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
       if (cached != null) {
         final data = jsonDecode(cached) as Map<String, dynamic>;
         setState(() {
-          _user = data['user'] != null ? Map<String, dynamic>.from(data['user']) : null;
-          _categories = data['categories'] != null
-              ? List<Map<String, dynamic>>.from(
-                  (data['categories'] as List).map((e) => Map<String, dynamic>.from(e)),
-                )
-              : <Map<String, dynamic>>[];
-          _lastSession = data['last_session'] != null ? Map<String, dynamic>.from(data['last_session']) : null;
+          _categories = <Map<String, dynamic>>[];
+          _lastSession = null;
+          _user = null;
+
+          final rawCategories = data['categories'];
+          if (rawCategories is List) {
+            _categories = rawCategories
+                .whereType<Map>()
+                .map((e) => Map<String, dynamic>.from(e))
+                .toList();
+          }
+
+          final rawSession = data['last_session'];
+          if (rawSession != null && rawSession is Map) {
+            _lastSession = Map<String, dynamic>.from(rawSession);
+          }
+
+          final rawUser = data['user'];
+          if (rawUser != null && rawUser is Map) {
+            _user = Map<String, dynamic>.from(rawUser);
+          }
+
           _loadingCategories = false;
           _loadingSession = false;
           _isLoading = _user == null;
@@ -102,26 +117,26 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
       if (!mounted) return;
 
       setState(() {
-        if (userData is Map) {
-          if (userData.containsKey('user')) {
-            _user = Map<String,dynamic>
-                .from(userData['user']);
-          } else {
-            _user = Map<String,dynamic>
-                .from(userData);
-          }
-        }
-
-        if (categoriesData is List) {
-          _categories = categoriesData
-              .map((e) => Map<String,dynamic>.from(e))
+        final rawCategories = categoriesData;
+        if (rawCategories is List) {
+          _categories = rawCategories
+              .whereType<Map>()
+              .map((e) => Map<String, dynamic>.from(e))
               .toList();
         }
 
-        if (sessionsData is List &&
-            sessionsData.isNotEmpty) {
-          _lastSession = Map<String,dynamic>
-              .from(sessionsData[0]);
+        final rawSession = sessionsData is List && sessionsData.isNotEmpty
+            ? sessionsData.first
+            : null;
+        if (rawSession != null && rawSession is Map) {
+          _lastSession = Map<String, dynamic>.from(rawSession);
+        }
+
+        final rawUser = userData is Map && userData['user'] is Map
+            ? userData['user']
+            : userData;
+        if (rawUser != null && rawUser is Map) {
+          _user = Map<String, dynamic>.from(rawUser);
         }
 
         _isLoading = false;
