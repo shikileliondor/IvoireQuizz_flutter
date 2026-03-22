@@ -301,186 +301,282 @@ class _QuizScreenState extends State<QuizScreen> {
   }
 
   Widget _buildTopBar() {
-    final progress = (_currentIndex + 1) / _questions.length;
-
     return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
-      child: Column(
+      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+      child: Row(
         children: [
-          Row(
-            children: [
-              IconButton(
-                onPressed: () => context.pop(),
-                icon: const Icon(Icons.arrow_back_ios_new_rounded),
-                color: _textDark,
+          GestureDetector(
+            onTap: () => context.pop(),
+            child: Container(
+              width: 36,
+              height: 36,
+              decoration: BoxDecoration(
+                color: _cardBg,
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(color: _neutral),
               ),
-              Expanded(
-                child: Text(
-                  'Question ${_currentIndex + 1}/${_questions.length}',
-                  textAlign: TextAlign.center,
+              child: const Icon(
+                Icons.close_rounded,
+                color: _textGray,
+                size: 20,
+              ),
+            ),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(4),
+              child: LinearProgressIndicator(
+                value: (_currentIndex + 1) / _questions.length,
+                backgroundColor: _neutral,
+                valueColor: const AlwaysStoppedAnimation(_orange),
+                minHeight: 8,
+              ),
+            ),
+          ),
+          const SizedBox(width: 12),
+          AnimatedContainer(
+            duration: const Duration(milliseconds: 300),
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+            decoration: BoxDecoration(
+              color: _timeLeft <= 5 ? const Color(0xFFFFEBEB) : _cardBg,
+              borderRadius: BorderRadius.circular(20),
+              border: Border.all(color: _timeLeft <= 5 ? _incorrect : _neutral),
+            ),
+            child: Row(
+              children: [
+                Icon(
+                  Icons.timer_outlined,
+                  color: _timeLeft <= 5 ? _incorrect : _textGray,
+                  size: 16,
+                ),
+                const SizedBox(width: 4),
+                Text(
+                  '$_timeLeft s',
                   style: GoogleFonts.nunito(
-                    fontSize: 16,
-                    fontWeight: FontWeight.w800,
-                    color: _textDark,
+                    fontSize: 14,
+                    fontWeight: FontWeight.w700,
+                    color: _timeLeft <= 5 ? _incorrect : _textDark,
                   ),
                 ),
-              ),
-              _buildTimer(),
-            ],
-          ),
-          const SizedBox(height: 8),
-          ClipRRect(
-            borderRadius: BorderRadius.circular(100),
-            child: LinearProgressIndicator(
-              value: progress,
-              minHeight: 7,
-              backgroundColor: _neutral,
-              valueColor: const AlwaysStoppedAnimation<Color>(_orange),
+              ],
             ),
           ),
         ],
-      ),
-    ).animate().fadeIn(duration: 350.ms);
-  }
-
-  Widget _buildTimer() {
-    final danger = _timeLeft <= 5;
-
-    return AnimatedContainer(
-      duration: const Duration(milliseconds: 250),
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-      decoration: BoxDecoration(
-        color: danger ? _incorrect.withValues(alpha: 0.12) : _cardBg,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(
-          color: danger ? _incorrect.withValues(alpha: 0.25) : _neutral,
-        ),
-      ),
-      child: Text(
-        '${_timeLeft}s',
-        style: GoogleFonts.nunito(
-          fontSize: 14,
-          fontWeight: FontWeight.w800,
-          color: danger ? _incorrect : _textDark,
-        ),
       ),
     );
   }
 
   Widget _buildQuestion() {
     final question = _questions[_currentIndex];
-    final questionText = (question['question_text'] ?? question['question'] ?? '')
-        .toString();
 
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-      child: Container(
-        width: double.infinity,
-        padding: const EdgeInsets.all(20),
-        decoration: BoxDecoration(
-          color: _cardBg,
-          borderRadius: BorderRadius.circular(20),
-          border: Border.all(color: _neutral),
-        ),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            const Icon(Icons.psychology_alt_outlined, color: _orange, size: 30),
-            const SizedBox(height: 16),
-            Text(
-              questionText,
-              textAlign: TextAlign.center,
-              style: GoogleFonts.nunito(
-                fontSize: 22,
-                fontWeight: FontWeight.w800,
-                color: _textDark,
-              ),
+    return SingleChildScrollView(
+      padding: const EdgeInsets.symmetric(horizontal: 20),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const SizedBox(height: 8),
+          Text(
+            'Question ${_currentIndex + 1} sur ${_questions.length}',
+            style: GoogleFonts.nunito(
+              fontSize: 13,
+              color: _textGray,
             ),
+          ),
+          const SizedBox(height: 16),
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(20),
+            decoration: BoxDecoration(
+              color: _cardBg,
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: _neutral),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    _buildDifficultyBadge(question['difficulty'] ?? 1),
+                    Image.asset(
+                      'assets/images/kwame.png',
+                      height: 50,
+                      fit: BoxFit.contain,
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 12),
+                Text(
+                  question['question_text'] ?? '',
+                  style: GoogleFonts.nunito(
+                    fontSize: 18,
+                    fontWeight: FontWeight.w600,
+                    color: _textDark,
+                    height: 1.5,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          if (_answered) ...[
+            const SizedBox(height: 12),
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: const Color(0xFFE8F5E9),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: _correct),
+              ),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Icon(Icons.lightbulb_outline, color: _correct, size: 18),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      question['explanation'] ?? '',
+                      style: GoogleFonts.nunito(
+                        fontSize: 13,
+                        color: _textDark,
+                        height: 1.5,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ).animate().fadeIn(duration: 300.ms).slideY(begin: 0.2),
           ],
-        ),
+          const SizedBox(height: 16),
+        ],
       ),
-    ).animate().fadeIn(duration: 350.ms).slideY(begin: 0.08, end: 0);
+    );
   }
 
   Widget _buildOptions() {
     final question = _questions[_currentIndex];
-    final rawOptions = (question['options'] as List? ?? const <dynamic>[])
-        .map((e) => Map<String, dynamic>.from(e))
-        .toList();
-
-    int? correctId;
-    for (final option in rawOptions) {
-      if (option['is_correct'] == true || option['is_correct'] == 1) {
-        correctId = option['id'] as int?;
-        break;
-      }
-    }
+    final options = question['options'] as List;
+    final letters = ['A', 'B', 'C', 'D'];
 
     return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
+      padding: const EdgeInsets.fromLTRB(20, 0, 20, 24),
       child: Column(
-        children: List.generate(rawOptions.length, (index) {
-          final option = rawOptions[index];
-          final id = option['id'] as int?;
-          final isSelected = id == _selectedOptionId;
-          final isCorrect = id != null && id == correctId;
-
-          Color borderColor = _neutral;
-          Color fillColor = Colors.white;
-          Color textColor = _textDark;
-
-          if (_answered) {
-            if (isCorrect) {
-              borderColor = _correct;
-              fillColor = _correct.withValues(alpha: 0.08);
-            } else if (isSelected) {
-              borderColor = _incorrect;
-              fillColor = _incorrect.withValues(alpha: 0.08);
-            }
-          } else if (isSelected) {
-            borderColor = _orange;
-            fillColor = _orange.withValues(alpha: 0.08);
-          }
+        children: List.generate(options.length, (i) {
+          final option = Map<String, dynamic>.from(options[i]);
+          final optionId = option['id'] as int;
+          final isSelected = _selectedOptionId == optionId;
+          final isNotSelected = _answered && !isSelected;
 
           return Padding(
-            padding: const EdgeInsets.only(bottom: 12),
-            child: InkWell(
-              onTap: _answered ? null : () => _onOptionSelected(id),
-              borderRadius: BorderRadius.circular(14),
-              child: AnimatedContainer(
-                duration: const Duration(milliseconds: 250),
-                width: double.infinity,
-                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
-                decoration: BoxDecoration(
-                  color: fillColor,
-                  borderRadius: BorderRadius.circular(14),
-                  border: Border.all(color: borderColor, width: 1.5),
-                ),
-                child: Row(
-                  children: [
-                    Expanded(
-                      child: Text(
-                        (option['option_text'] ?? option['text'] ?? '').toString(),
-                        style: GoogleFonts.nunito(
-                          fontSize: 15,
-                          fontWeight: FontWeight.w700,
-                          color: textColor,
+            padding: const EdgeInsets.only(bottom: 10),
+            child: GestureDetector(
+              onTap: _answered ? null : () => _onOptionSelected(optionId),
+              child: AnimatedOpacity(
+                duration: const Duration(milliseconds: 300),
+                opacity: isNotSelected ? 0.5 : 1.0,
+                child: AnimatedContainer(
+                  duration: const Duration(milliseconds: 300),
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: isSelected ? const Color(0xFFFFF3E8) : Colors.white,
+                    borderRadius: BorderRadius.circular(14),
+                    border: Border.all(
+                      color: isSelected ? _orange : _neutral,
+                      width: isSelected ? 2 : 1,
+                    ),
+                  ),
+                  child: Row(
+                    children: [
+                      Container(
+                        width: 28,
+                        height: 28,
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          color: isSelected ? _orange : _cardBg,
+                          border: Border.all(
+                            color: isSelected ? _orange : _neutral,
+                          ),
+                        ),
+                        child: Center(
+                          child: Text(
+                            i < letters.length ? letters[i] : '?',
+                            style: GoogleFonts.nunito(
+                              fontSize: 13,
+                              fontWeight: FontWeight.w700,
+                              color: isSelected ? Colors.white : _textGray,
+                            ),
+                          ),
                         ),
                       ),
-                    ),
-                    if (_answered && isCorrect)
-                      const Icon(Icons.check_circle, color: _correct)
-                    else if (_answered && isSelected && !isCorrect)
-                      const Icon(Icons.cancel, color: _incorrect),
-                  ],
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Text(
+                          option['option_text'] ?? '',
+                          style: GoogleFonts.nunito(
+                            fontSize: 15,
+                            fontWeight: FontWeight.w600,
+                            color: _textDark,
+                          ),
+                        ),
+                      ),
+                      if (isSelected)
+                        const Icon(
+                          Icons.radio_button_checked,
+                          color: _orange,
+                          size: 20,
+                        ),
+                    ],
+                  ),
                 ),
               ),
             ),
-          )
-              .animate(delay: (70 * index).ms)
-              .fadeIn(duration: 250.ms)
-              .slideX(begin: 0.08, end: 0);
+          );
         }),
+      ),
+    );
+  }
+
+  Widget _buildDifficultyBadge(int difficulty) {
+    Color bgColor;
+    Color textColor;
+    String label;
+
+    switch (difficulty) {
+      case 1:
+        bgColor = const Color(0xFFE8F5E9);
+        textColor = _correct;
+        label = 'Facile';
+        break;
+      case 2:
+        bgColor = const Color(0xFFFFF3E8);
+        textColor = _orange;
+        label = 'Moyen';
+        break;
+      case 3:
+        bgColor = const Color(0xFFFFEBEB);
+        textColor = _incorrect;
+        label = 'Difficile';
+        break;
+      default:
+        bgColor = _cardBg;
+        textColor = _textGray;
+        label = 'Question';
+    }
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+      decoration: BoxDecoration(
+        color: bgColor,
+        borderRadius: BorderRadius.circular(20),
+      ),
+      child: Text(
+        label,
+        style: GoogleFonts.nunito(
+          fontSize: 11,
+          fontWeight: FontWeight.w600,
+          color: textColor,
+        ),
       ),
     );
   }
