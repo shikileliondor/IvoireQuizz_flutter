@@ -18,6 +18,7 @@ class HomeScreen extends ConsumerStatefulWidget {
 }
 
 class _HomeScreenState extends ConsumerState<HomeScreen> {
+  static const int _homeCategoriesLimit = 3;
   String _selectedMode = 'category';
   List<Map<String, dynamic>> _categories = <Map<String, dynamic>>[];
   Map<String, dynamic>? _lastSession;
@@ -505,18 +506,56 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   }
 
   Widget _buildCategoriesSection() {
+    final List<Map<String, dynamic>> previewCategories = _categories.length > _homeCategoriesLimit
+        ? _categories.take(_homeCategoriesLimit).toList()
+        : _categories;
+    final bool hasMoreCategories = _categories.length > _homeCategoriesLimit;
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: <Widget>[
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: 20),
-          child: Text(
-            'Choisir une catégorie',
-            style: GoogleFonts.nunito(
-              fontSize: 18,
-              fontWeight: FontWeight.w700,
-              color: AppColors.textDark,
-            ),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: <Widget>[
+              Text(
+                'Choisir une catégorie',
+                style: GoogleFonts.nunito(
+                  fontSize: 18,
+                  fontWeight: FontWeight.w700,
+                  color: AppColors.textDark,
+                ),
+              ),
+              if (hasMoreCategories)
+                GestureDetector(
+                  onTap: () => context.push(
+                    '/home/categories',
+                    extra: <String, dynamic>{
+                      'categories': _categories,
+                      'selected_mode': _selectedMode,
+                    },
+                  ),
+                  child: Row(
+                    children: <Widget>[
+                      Text(
+                        'Voir tout',
+                        style: GoogleFonts.nunito(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w700,
+                          color: const Color(0xFFF77F00),
+                        ),
+                      ),
+                      const SizedBox(width: 4),
+                      const Icon(
+                        Icons.arrow_forward_ios_rounded,
+                        size: 14,
+                        color: Color(0xFFF77F00),
+                      ),
+                    ],
+                  ),
+                ),
+            ],
           ),
         ),
         const SizedBox(height: 12),
@@ -526,83 +565,110 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
               color: Color(0xFFF77F00),
             ),
           )
+        else if (previewCategories.isEmpty)
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 6),
+            child: Text(
+              'Aucune catégorie disponible pour le moment.',
+              style: GoogleFonts.nunito(
+                fontSize: 14,
+                fontWeight: FontWeight.w500,
+                color: AppColors.textGray,
+              ),
+            ),
+          )
         else
           ListView.separated(
             padding: const EdgeInsets.symmetric(horizontal: 20),
             shrinkWrap: true,
             physics: const NeverScrollableScrollPhysics(),
-            itemCount: _categories.length,
+            itemCount: previewCategories.length,
             separatorBuilder: (_, __) => const SizedBox(height: 12),
             itemBuilder: (BuildContext context, int index) {
-              final Map<String, dynamic> category = _categories[index];
+              final Map<String, dynamic> category = previewCategories[index];
               final ({Color bgColor, Color iconColor, IconData icon}) style = _getCategoryStyle(index);
 
-              return GestureDetector(
-                onTap: () {
-                  if (_selectedMode == 'mixed') {
-                    context.push('/quiz/null/mixed');
-                    return;
-                  }
-                  context.push('/quiz/${category['id']}/$_selectedMode');
-                },
-                child: Container(
-                  padding: const EdgeInsets.all(16),
-                  decoration: BoxDecoration(
-                    color: style.bgColor,
-                    borderRadius: const BorderRadius.all(Radius.circular(16)),
-                  ),
-                  child: Row(
-                    children: <Widget>[
-                      Container(
-                        width: 44,
-                        height: 44,
-                        decoration: BoxDecoration(
-                          color: Colors.white.withOpacity(0.6),
-                          borderRadius: const BorderRadius.all(Radius.circular(10)),
-                        ),
-                        child: Icon(
-                          style.icon,
-                          size: 24,
-                          color: style.iconColor,
-                        ),
-                      ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: <Widget>[
-                            Text(
-                              (category['name'] ?? '') as String,
-                              style: GoogleFonts.nunito(
-                                fontSize: 15,
-                                fontWeight: FontWeight.w700,
-                                color: AppColors.textDark,
-                              ),
-                            ),
-                            const SizedBox(height: 4),
-                            Text(
-                              '${category['questions_count']} questions disponibles',
-                              style: GoogleFonts.nunito(
-                                fontSize: 13,
-                                fontWeight: FontWeight.w400,
-                                color: AppColors.textGray,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                      const Icon(
-                        Icons.chevron_right_rounded,
-                        color: AppColors.textGray,
-                        size: 20,
-                      ),
-                    ],
-                  ),
-                ),
+              return _buildCategoryCard(
+                category: category,
+                style: style,
               );
             },
           ),
       ],
+    );
+  }
+
+  Widget _buildCategoryCard({
+    required Map<String, dynamic> category,
+    required ({Color bgColor, Color iconColor, IconData icon}) style,
+  }) {
+    final String categoryName = (category['name'] as String?)?.trim().isNotEmpty == true
+        ? (category['name'] as String).trim()
+        : 'Catégorie';
+    final int questionsCount = (category['questions_count'] as num?)?.toInt() ?? 0;
+
+    return GestureDetector(
+      onTap: () {
+        if (_selectedMode == 'mixed') {
+          context.push('/quiz/null/mixed');
+          return;
+        }
+        context.push('/quiz/${category['id']}/$_selectedMode');
+      },
+      child: Container(
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: style.bgColor,
+          borderRadius: const BorderRadius.all(Radius.circular(16)),
+        ),
+        child: Row(
+          children: <Widget>[
+            Container(
+              width: 44,
+              height: 44,
+              decoration: BoxDecoration(
+                color: Colors.white.withOpacity(0.6),
+                borderRadius: const BorderRadius.all(Radius.circular(10)),
+              ),
+              child: Icon(
+                style.icon,
+                size: 24,
+                color: style.iconColor,
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: <Widget>[
+                  Text(
+                    categoryName,
+                    style: GoogleFonts.nunito(
+                      fontSize: 15,
+                      fontWeight: FontWeight.w700,
+                      color: AppColors.textDark,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    '$questionsCount questions disponibles',
+                    style: GoogleFonts.nunito(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w400,
+                      color: AppColors.textGray,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const Icon(
+              Icons.chevron_right_rounded,
+              color: AppColors.textGray,
+              size: 20,
+            ),
+          ],
+        ),
+      ),
     );
   }
 
