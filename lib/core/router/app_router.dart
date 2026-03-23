@@ -6,6 +6,7 @@ import 'package:google_fonts/google_fonts.dart';
 
 import '../../features/auth/screens/auth_screen.dart';
 import '../../features/friends/screens/friends_screen.dart';
+import '../../features/home/screens/all_categories_screen.dart';
 import '../../features/home/screens/home_screen.dart';
 import '../../features/leaderboard/screens/leaderboard_screen.dart';
 import '../../features/onboarding/screens/onboarding_screen.dart';
@@ -38,6 +39,34 @@ final Provider<GoRouter> routerProvider = Provider<GoRouter>((Ref ref) {
           GoRoute(
             path: '/home',
             builder: (BuildContext context, GoRouterState state) => const HomeScreen(),
+          ),
+          GoRoute(
+            path: '/home/categories',
+            builder: (BuildContext context, GoRouterState state) {
+              final dynamic extra = state.extra;
+              final List<Map<String, dynamic>> categories;
+              final String selectedMode;
+
+              if (extra is Map) {
+                final dynamic rawCategories = extra['categories'];
+                categories = rawCategories is List
+                    ? rawCategories
+                        .whereType<Map>()
+                        .map((dynamic e) => Map<String, dynamic>.from(e as Map))
+                        .toList()
+                    : <Map<String, dynamic>>[];
+                final dynamic rawMode = extra['selected_mode'];
+                selectedMode = rawMode is String ? rawMode : 'category';
+              } else {
+                categories = <Map<String, dynamic>>[];
+                selectedMode = 'category';
+              }
+
+              return AllCategoriesScreen(
+                categories: categories,
+                selectedMode: selectedMode,
+              );
+            },
           ),
           GoRoute(
             path: '/leaderboard',
