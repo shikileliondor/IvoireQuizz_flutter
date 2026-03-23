@@ -620,7 +620,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     }
 
     final Map<String, dynamic> session = _lastSession!;
-    final String categoryName = (session['category'] as Map<String, dynamic>?)?['name'] as String? ?? 'Catégorie';
+    final String categoryName = _getCategoryName(session['category']);
     final String scoreText = '${session['correct_answers'] ?? 0}/10 · ${session['total_score'] ?? 0} pts';
     final String completedAt = (session['completed_at'] as String?) ?? DateTime.now().toIso8601String();
 
@@ -718,6 +718,26 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
         ],
       ),
     );
+  }
+
+  String _getCategoryName(dynamic rawCategory) {
+    if (rawCategory is Map) {
+      final dynamic rawName = rawCategory['name'];
+      if (rawName is String && rawName.trim().isNotEmpty) {
+        return rawName;
+      }
+    }
+
+    if (rawCategory is List) {
+      final Iterable<Map<dynamic, dynamic>> categories = rawCategory.whereType<Map<dynamic, dynamic>>();
+      final Map<dynamic, dynamic>? firstCategory = categories.isNotEmpty ? categories.first : null;
+      final dynamic rawName = firstCategory?['name'];
+      if (rawName is String && rawName.trim().isNotEmpty) {
+        return rawName;
+      }
+    }
+
+    return 'Catégorie';
   }
 }
 
