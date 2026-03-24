@@ -12,7 +12,7 @@ import '../../features/leaderboard/screens/leaderboard_screen.dart';
 import '../../features/onboarding/screens/onboarding_screen.dart';
 import '../../features/profile/screens/profile_screen.dart';
 import '../../features/quiz/screens/quiz_screen.dart';
-import '../../features/quiz/screens/result_screen.dart';
+import '../../features/result/screens/result_screen.dart';
 import '../theme/app_theme.dart';
 
 final Provider<GoRouter> routerProvider = Provider<GoRouter>((Ref ref) {
