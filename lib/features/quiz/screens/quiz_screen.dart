@@ -381,7 +381,7 @@ class _QuizScreenState extends State<QuizScreen> {
                     _buildDifficultyBadge(
                       question['difficulty'] ?? 1),
                     Image.asset(
-                      'assets/effobi reflechit.png',
+                      'assets/avecfodn.jpeg',
                       height: 50,
                       fit: BoxFit.contain,
                       errorBuilder: (context, error, stack) {

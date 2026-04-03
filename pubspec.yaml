@@ -66,6 +66,6 @@ flutter:
 flutter_launcher_icons:
   android: true
   ios: true
-  image_path: "assets/effobi reflechit.png"
+  image_path: "assets/avecfodn.jpeg"
   adaptive_icon_background: "#F77F00"
-  adaptive_icon_foreground: "assets/effobi reflechit.png"
+  adaptive_icon_foreground: "assets/avecfodn.jpeg"

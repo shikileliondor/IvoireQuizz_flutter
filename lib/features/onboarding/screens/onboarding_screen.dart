@@ -122,7 +122,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
                   Image.asset(
-                    'assets/effobi reflechit.png',
+                    'assets/morel1.png',
                     height: 220,
                     fit: BoxFit.contain,
                     errorBuilder: (context, error, stack) {
@@ -190,7 +190,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                       alignment: Alignment.center,
                       children: [
                         Image.asset(
-                          'assets/effobi reflechit.png',
+                          'assets/avecfodn.jpeg',
                           height: 180,
                           fit: BoxFit.contain,
                           errorBuilder: (context, error, stack) {
@@ -571,7 +571,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
           child: isWinner
               ? ClipOval(
                   child: Image.asset(
-                    'assets/effobi reflechit.png',
+                    'assets/avecfodn.jpeg',
                     fit: BoxFit.cover,
                     errorBuilder: (context, error, stack) {
                       return Container(
