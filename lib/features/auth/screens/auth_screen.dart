@@ -263,8 +263,8 @@ class _AuthScreenState extends State<AuthScreen>
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
                       Container(
-                        width: 48,
-                        height: 48,
+                        width: 80,
+                        height: 80,
                         decoration: BoxDecoration(
                           color: const Color(0xFFF77F00),
                           borderRadius: const BorderRadius.all(Radius.circular(14)),
@@ -272,7 +272,7 @@ class _AuthScreenState extends State<AuthScreen>
                         child: ClipRRect(
                           borderRadius: const BorderRadius.all(Radius.circular(14)),
                           child: Image.asset(
-                            'assets/ivoire Quizz.png',
+                            'assets/avecfodn.jpeg',
                             fit: BoxFit.cover,
                             errorBuilder: (context, error, stack) {
                               return Container(
@@ -280,7 +280,7 @@ class _AuthScreenState extends State<AuthScreen>
                                 child: const Icon(
                                   Icons.pets,
                                   color: Color(0xFFF77F00),
-                                  size: 40,
+                                  size: 80,
                                 ),
                               );
                             },

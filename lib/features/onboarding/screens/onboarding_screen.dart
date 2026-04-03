@@ -305,7 +305,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
                   Image.asset(
-                    'assets/effobi reflechit.png',
+                    'assets/morel1.png',
                     height: 160,
                     fit: BoxFit.contain,
                     errorBuilder: (context, error, stack) {
