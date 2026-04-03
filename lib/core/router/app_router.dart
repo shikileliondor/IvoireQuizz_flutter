@@ -187,6 +187,18 @@ class _SplashScreenState extends State<SplashScreen> {
               const CircularProgressIndicator(
                 color: AppColors.white,
               ),
+              const SizedBox(height: 16),
+              Image.asset(
+                'assets/effobi reflechit.png',
+                height: 100,
+                errorBuilder: (ctx, err, st) => Text(
+                  'Image non trouvée: $err',
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 10,
+                  ),
+                ),
+              ),
             ],
           ),
         ),

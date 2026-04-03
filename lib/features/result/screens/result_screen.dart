@@ -28,10 +28,10 @@ class ResultScreen extends StatelessWidget {
   }
 
   String _getEmoji(int correct) {
-    if (correct == 10) return 'assets/images/kwame.png';
-    if (correct >= 7) return 'assets/images/kwame.png';
-    if (correct >= 4) return 'assets/images/kwame.png';
-    return 'assets/images/kwame.png';
+    if (correct == 10) return 'assets/effobi reflechit.png';
+    if (correct >= 7) return 'assets/effobi reflechit.png';
+    if (correct >= 4) return 'assets/effobi reflechit.png';
+    return 'assets/effobi reflechit.png';
   }
 
   @override
@@ -79,6 +79,17 @@ class ResultScreen extends StatelessWidget {
           Image.asset(
             _getEmoji(correctAnswers),
             height: correctAnswers >= 7 ? 120 : 90,
+            fit: BoxFit.contain,
+            errorBuilder: (context, error, stack) {
+              return Container(
+                color: const Color(0xFFFFF3E8),
+                child: const Icon(
+                  Icons.pets,
+                  color: Color(0xFFF77F00),
+                  size: 40,
+                ),
+              );
+            },
           )
               .animate()
               .fadeIn(duration: 600.ms)

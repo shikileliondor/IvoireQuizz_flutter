@@ -122,9 +122,19 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
                   Image.asset(
-                    'assets/images/kwame.png',
+                    'assets/effobi reflechit.png',
                     height: 220,
                     fit: BoxFit.contain,
+                    errorBuilder: (context, error, stack) {
+                      return Container(
+                        color: const Color(0xFFFFF3E8),
+                        child: const Icon(
+                          Icons.pets,
+                          color: Color(0xFFF77F00),
+                          size: 40,
+                        ),
+                      );
+                    },
                   )
                       .animate()
                       .fadeIn(duration: 600.ms)
@@ -180,9 +190,19 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                       alignment: Alignment.center,
                       children: [
                         Image.asset(
-                          'assets/images/kwame.png',
+                          'assets/effobi reflechit.png',
                           height: 180,
                           fit: BoxFit.contain,
+                          errorBuilder: (context, error, stack) {
+                            return Container(
+                              color: const Color(0xFFFFF3E8),
+                              child: const Icon(
+                                Icons.pets,
+                                color: Color(0xFFF77F00),
+                                size: 40,
+                              ),
+                            );
+                          },
                         )
                             .animate()
                             .fadeIn(duration: 600.ms)
@@ -285,9 +305,19 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
                   Image.asset(
-                    'assets/images/kwame.png',
+                    'assets/effobi reflechit.png',
                     height: 160,
                     fit: BoxFit.contain,
+                    errorBuilder: (context, error, stack) {
+                      return Container(
+                        color: const Color(0xFFFFF3E8),
+                        child: const Icon(
+                          Icons.pets,
+                          color: Color(0xFFF77F00),
+                          size: 40,
+                        ),
+                      );
+                    },
                   )
                       .animate()
                       .fadeIn(duration: 600.ms)
@@ -541,8 +571,18 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
           child: isWinner
               ? ClipOval(
                   child: Image.asset(
-                    'assets/images/kwame.png',
+                    'assets/effobi reflechit.png',
                     fit: BoxFit.cover,
+                    errorBuilder: (context, error, stack) {
+                      return Container(
+                        color: const Color(0xFFFFF3E8),
+                        child: const Icon(
+                          Icons.pets,
+                          color: Color(0xFFF77F00),
+                          size: 40,
+                        ),
+                      );
+                    },
                   ),
                 )
               : Center(

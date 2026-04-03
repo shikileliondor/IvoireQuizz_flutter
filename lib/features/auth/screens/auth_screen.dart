@@ -272,8 +272,18 @@ class _AuthScreenState extends State<AuthScreen>
                         child: ClipRRect(
                           borderRadius: const BorderRadius.all(Radius.circular(14)),
                           child: Image.asset(
-                            'assets/images/ivoire Quizz.png',
+                            'assets/ivoire Quizz.png',
                             fit: BoxFit.cover,
+                            errorBuilder: (context, error, stack) {
+                              return Container(
+                                color: const Color(0xFFFFF3E8),
+                                child: const Icon(
+                                  Icons.pets,
+                                  color: Color(0xFFF77F00),
+                                  size: 40,
+                                ),
+                              );
+                            },
                           ),
                         ),
                       ),

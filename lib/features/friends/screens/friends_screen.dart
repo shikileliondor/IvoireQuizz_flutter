@@ -184,7 +184,7 @@ class _FriendsScreenState extends State<FriendsScreen> {
               ),
               const SizedBox(height: 20),
               Image.asset(
-                'assets/images/kwame.png',
+                'assets/effobi reflechit.png',
                 height: 80,
                 errorBuilder: (_, __, ___) => const SizedBox.shrink(),
               ),

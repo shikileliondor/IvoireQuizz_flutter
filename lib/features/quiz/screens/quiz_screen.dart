@@ -381,9 +381,20 @@ class _QuizScreenState extends State<QuizScreen> {
                     _buildDifficultyBadge(
                       question['difficulty'] ?? 1),
                     Image.asset(
-                      'assets/images/kwame.png',
+                      'assets/effobi reflechit.png',
                       height: 50,
-                      fit: BoxFit.contain),
+                      fit: BoxFit.contain,
+                      errorBuilder: (context, error, stack) {
+                        return Container(
+                          color: const Color(0xFFFFF3E8),
+                          child: const Icon(
+                            Icons.pets,
+                            color: Color(0xFFF77F00),
+                            size: 40,
+                          ),
+                        );
+                      },
+                    ),
                   ],
                 ),
                 const SizedBox(height: 12),
