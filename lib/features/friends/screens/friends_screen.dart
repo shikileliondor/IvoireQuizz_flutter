@@ -25,6 +25,7 @@ class _FriendsScreenState extends State<FriendsScreen> {
   List<Map<String, dynamic>> _friends = <Map<String, dynamic>>[];
   List<Map<String, dynamic>> _requests = <Map<String, dynamic>>[];
   bool _isLoading = true;
+  Future<void>? _loadDataFuture;
   static const _storage = FlutterSecureStorage();
 
   @override
@@ -35,21 +36,20 @@ class _FriendsScreenState extends State<FriendsScreen> {
 
   Future<Dio> _createDio() async {
     final token = await _storage.read(key: 'auth_token');
-    return Dio(
-      BaseOptions(
-        baseUrl: ApiConfig.apiBaseUrl,
-        connectTimeout: const Duration(seconds: 10),
-        receiveTimeout: const Duration(seconds: 10),
-        headers: <String, String>{
-          'Accept': 'application/json',
-          'Content-Type': 'application/json',
-          'Authorization': 'Bearer $token',
-        },
-      ),
-    );
+    return ApiConfig.createDio(authToken: token);
   }
 
-  Future<void> _loadData() async {
+  Future<void> _loadData() {
+    final Future<void>? runningLoad = _loadDataFuture;
+    if (runningLoad != null) return runningLoad;
+
+    final Future<void> load = _loadDataInternal();
+    _loadDataFuture = load;
+    load.whenComplete(() => _loadDataFuture = null);
+    return load;
+  }
+
+  Future<void> _loadDataInternal() async {
     if (mounted) {
       setState(() => _isLoading = true);
     }

@@ -37,7 +37,8 @@ class _QuizScreenState extends State<QuizScreen> {
   int? _selectedOptionId;
   bool _answered = false;
   bool _isCorrectAnswer = false;
-  bool _isLoading = true;
+  bool _hasStarted = false;
+  bool _isLoading = false;
   bool _isSubmitting = false;
   int _timeLeft = 20;
   int _sessionStartTime = 0;
@@ -50,13 +51,22 @@ class _QuizScreenState extends State<QuizScreen> {
     super.initState();
     _sessionStartTime = DateTime.now()
       .millisecondsSinceEpoch;
-    _loadQuestions();
   }
 
   @override
   void dispose() {
     _timer?.cancel();
     super.dispose();
+  }
+
+  Future<void> _startQuiz() async {
+    if (_isLoading || _hasStarted) return;
+    setState(() {
+      _hasStarted = true;
+      _isLoading = true;
+    });
+    _sessionStartTime = DateTime.now().millisecondsSinceEpoch;
+    await _loadQuestions();
   }
 
   Future<void> _loadQuestions() async {
@@ -74,16 +84,7 @@ class _QuizScreenState extends State<QuizScreen> {
         return;
       }
 
-      final dio = Dio(BaseOptions(
-        baseUrl: ApiConfig.apiBaseUrl,
-        connectTimeout: const Duration(seconds: 10),
-        receiveTimeout: const Duration(seconds: 10),
-        headers: {
-          'Accept': 'application/json',
-          'Content-Type': 'application/json',
-          'Authorization': 'Bearer $token',
-        },
-      ));
+      final dio = ApiConfig.createDio(authToken: token);
 
       final Map<String,dynamic> params = {
         'mode': widget.mode,
@@ -196,16 +197,7 @@ class _QuizScreenState extends State<QuizScreen> {
     try {
       final token = await _storage
         .read(key: 'auth_token');
-      final dio = Dio(BaseOptions(
-        baseUrl: ApiConfig.apiBaseUrl,
-        connectTimeout: const Duration(seconds: 10),
-        receiveTimeout: const Duration(seconds: 10),
-        headers: {
-          'Accept': 'application/json',
-          'Content-Type': 'application/json',
-          'Authorization': 'Bearer $token',
-        },
-      ));
+      final dio = ApiConfig.createDio(authToken: token);
       final durationSeconds =
         ((DateTime.now().millisecondsSinceEpoch -
           _sessionStartTime) / 1000).round();
@@ -233,6 +225,125 @@ class _QuizScreenState extends State<QuizScreen> {
       debugPrint('SUBMIT ERROR: $e');
       setState(() => _isSubmitting = false);
     }
+  }
+
+  Widget _buildStartScreen() {
+    final bool isMixed = widget.mode == 'mixed';
+    return Scaffold(
+      backgroundColor: Colors.white,
+      body: SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            children: <Widget>[
+              Align(
+                alignment: Alignment.centerLeft,
+                child: GestureDetector(
+                  onTap: () => context.pop(),
+                  child: Container(
+                    width: 40,
+                    height: 40,
+                    decoration: BoxDecoration(
+                      color: _cardBg,
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: _neutral),
+                    ),
+                    child: const Icon(Icons.arrow_back_rounded, color: _textGray),
+                  ),
+                ),
+              ),
+              const Spacer(),
+              Container(
+                width: 96,
+                height: 96,
+                decoration: const BoxDecoration(
+                  color: Color(0xFFFFF3E8),
+                  shape: BoxShape.circle,
+                ),
+                child: Icon(
+                  isMixed ? Icons.shuffle_rounded : Icons.play_arrow_rounded,
+                  color: _orange,
+                  size: 44,
+                ),
+              ),
+              const SizedBox(height: 24),
+              Text(
+                isMixed ? 'Mode mixte' : 'Quiz par catégorie',
+                textAlign: TextAlign.center,
+                style: GoogleFonts.nunito(
+                  fontSize: 26,
+                  fontWeight: FontWeight.w900,
+                  color: _textDark,
+                ),
+              ),
+              const SizedBox(height: 12),
+              Text(
+                'Les questions seront téléchargées uniquement quand vous démarrez la partie.',
+                textAlign: TextAlign.center,
+                style: GoogleFonts.nunito(
+                  fontSize: 15,
+                  height: 1.5,
+                  color: _textGray,
+                ),
+              ),
+              const SizedBox(height: 32),
+              SizedBox(
+                width: double.infinity,
+                height: 56,
+                child: ElevatedButton.icon(
+                  onPressed: _startQuiz,
+                  icon: const Icon(Icons.play_arrow_rounded, color: Colors.white),
+                  label: Text(
+                    'Lancer la partie',
+                    style: GoogleFonts.nunito(
+                      color: Colors.white,
+                      fontSize: 16,
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: _orange,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(16),
+                    ),
+                  ),
+                ),
+              ),
+              const Spacer(),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildLoadingSkeleton() {
+    return Scaffold(
+      backgroundColor: Colors.white,
+      body: SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.all(20),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: const <Widget>[
+              _QuizSkeletonBox(width: double.infinity, height: 40, radius: 12),
+              SizedBox(height: 32),
+              _QuizSkeletonBox(width: 120, height: 28, radius: 20),
+              SizedBox(height: 16),
+              _QuizSkeletonBox(width: double.infinity, height: 170, radius: 20),
+              SizedBox(height: 24),
+              _QuizSkeletonBox(width: double.infinity, height: 64, radius: 16),
+              SizedBox(height: 12),
+              _QuizSkeletonBox(width: double.infinity, height: 64, radius: 16),
+              SizedBox(height: 12),
+              _QuizSkeletonBox(width: double.infinity, height: 64, radius: 16),
+              SizedBox(height: 12),
+              _QuizSkeletonBox(width: double.infinity, height: 64, radius: 16),
+            ],
+          ),
+        ),
+      ),
+    );
   }
 
   Widget _buildDifficultyBadge(int difficulty) {
@@ -647,21 +758,11 @@ class _QuizScreenState extends State<QuizScreen> {
 
   @override
   Widget build(BuildContext context) {
+    if (!_hasStarted) {
+      return _buildStartScreen();
+    }
     if (_isLoading) {
-      return Scaffold(
-        backgroundColor: Colors.white,
-        body: Center(child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            const CircularProgressIndicator(
-              color: _orange),
-            const SizedBox(height: 16),
-            Text('Chargement des questions...',
-              style: GoogleFonts.nunito(
-                fontSize: 14, color: _textGray)),
-          ],
-        )),
-      );
+      return _buildLoadingSkeleton();
     }
     if (_isSubmitting) {
       return Scaffold(
@@ -720,6 +821,63 @@ class _QuizScreenState extends State<QuizScreen> {
           _buildOptions(),
         ]),
       ),
+    );
+  }
+}
+
+
+class _QuizSkeletonBox extends StatefulWidget {
+  const _QuizSkeletonBox({
+    required this.width,
+    required this.height,
+    this.radius = 8,
+  });
+
+  final double width;
+  final double height;
+  final double radius;
+
+  @override
+  State<_QuizSkeletonBox> createState() => _QuizSkeletonBoxState();
+}
+
+class _QuizSkeletonBoxState extends State<_QuizSkeletonBox>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _controller;
+  late final Animation<double> _animation;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(
+      duration: const Duration(milliseconds: 1200),
+      vsync: this,
+    )..repeat(reverse: true);
+    _animation = Tween<double>(begin: 0.4, end: 0.9).animate(
+      CurvedAnimation(parent: _controller, curve: Curves.easeInOut),
+    );
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedBuilder(
+      animation: _animation,
+      builder: (BuildContext context, Widget? child) {
+        return Container(
+          width: widget.width,
+          height: widget.height,
+          decoration: BoxDecoration(
+            color: _neutral.withOpacity(_animation.value),
+            borderRadius: BorderRadius.circular(widget.radius),
+          ),
+        );
+      },
     );
   }
 }

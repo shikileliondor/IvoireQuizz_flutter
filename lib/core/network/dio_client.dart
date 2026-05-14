@@ -7,17 +7,7 @@ import '../config/api_config.dart';
 class DioClient {
   DioClient()
       : _storage = const FlutterSecureStorage(),
-        _dio = Dio(
-          BaseOptions(
-            baseUrl: ApiConfig.apiBaseUrl,
-            connectTimeout: const Duration(seconds: 10),
-            receiveTimeout: const Duration(seconds: 10),
-            headers: const <String, String>{
-              'Accept': 'application/json',
-              'Content-Type': 'application/json',
-            },
-          ),
-        ) {
+        _dio = ApiConfig.createDio() {
     _dio.interceptors.add(
       InterceptorsWrapper(
         onRequest:

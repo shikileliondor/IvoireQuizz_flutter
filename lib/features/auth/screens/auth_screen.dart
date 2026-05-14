@@ -61,19 +61,7 @@ class _AuthScreenState extends State<AuthScreen>
     super.dispose();
   }
 
-  Dio _createDio() {
-    return Dio(
-      BaseOptions(
-        baseUrl: ApiConfig.apiBaseUrl,
-        connectTimeout: const Duration(seconds: 10),
-        receiveTimeout: const Duration(seconds: 10),
-        headers: {
-          'Accept': 'application/json',
-          'Content-Type': 'application/json',
-        },
-      ),
-    );
-  }
+  Dio _createDio() => ApiConfig.createDio();
 
   Future<void> _register() async {
     setState(() {

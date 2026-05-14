@@ -28,6 +28,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
   Map<String, dynamic>? _stats;
   bool _isLoading = true;
   bool _isLoggingOut = false;
+  Future<void>? _loadDataFuture;
   static const _storage = FlutterSecureStorage();
 
   @override
@@ -36,7 +37,17 @@ class _ProfileScreenState extends State<ProfileScreen> {
     _loadData();
   }
 
-  Future<void> _loadData() async {
+  Future<void> _loadData() {
+    final Future<void>? runningLoad = _loadDataFuture;
+    if (runningLoad != null) return runningLoad;
+
+    final Future<void> load = _loadDataInternal();
+    _loadDataFuture = load;
+    load.whenComplete(() => _loadDataFuture = null);
+    return load;
+  }
+
+  Future<void> _loadDataInternal() async {
     if (mounted) {
       setState(() => _isLoading = true);
     }
@@ -48,18 +59,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
         return;
       }
 
-      final dio = Dio(
-        BaseOptions(
-          baseUrl: ApiConfig.apiBaseUrl,
-          connectTimeout: const Duration(seconds: 10),
-          receiveTimeout: const Duration(seconds: 10),
-          headers: {
-            'Accept': 'application/json',
-            'Content-Type': 'application/json',
-            'Authorization': 'Bearer $token',
-          },
-        ),
-      );
+      final dio = ApiConfig.createDio(authToken: token);
 
       final results = await Future.wait([
         dio.get('/auth/me'),
@@ -108,15 +108,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
     }
     try {
       final token = await _storage.read(key: 'auth_token');
-      final dio = Dio(
-        BaseOptions(
-          baseUrl: ApiConfig.apiBaseUrl,
-          headers: {
-            'Accept': 'application/json',
-            'Authorization': 'Bearer $token',
-          },
-        ),
-      );
+      final dio = ApiConfig.createDio(authToken: token);
       await dio.post('/auth/logout');
     } catch (e) {
       debugPrint('LOGOUT ERROR: $e');
