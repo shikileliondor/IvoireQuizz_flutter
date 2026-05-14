@@ -7,6 +7,8 @@ import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import '../../../core/config/api_config.dart';
+
 const _orange    = Color(0xFFF77F00);
 const _textDark  = Color(0xFF1A1A2E);
 const _textGray  = Color(0xFF6B7280);
@@ -73,7 +75,7 @@ class _QuizScreenState extends State<QuizScreen> {
       }
 
       final dio = Dio(BaseOptions(
-        baseUrl: 'http://10.0.2.2:8000/api',
+        baseUrl: ApiConfig.apiBaseUrl,
         connectTimeout: const Duration(seconds: 10),
         receiveTimeout: const Duration(seconds: 10),
         headers: {
@@ -195,7 +197,7 @@ class _QuizScreenState extends State<QuizScreen> {
       final token = await _storage
         .read(key: 'auth_token');
       final dio = Dio(BaseOptions(
-        baseUrl: 'http://10.0.2.2:8000/api',
+        baseUrl: ApiConfig.apiBaseUrl,
         connectTimeout: const Duration(seconds: 10),
         receiveTimeout: const Duration(seconds: 10),
         headers: {

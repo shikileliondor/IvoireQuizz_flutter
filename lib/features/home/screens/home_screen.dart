@@ -8,6 +8,7 @@ import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import '../../../core/config/api_config.dart';
 import '../../../core/theme/app_theme.dart';
 
 class HomeScreen extends ConsumerStatefulWidget {
@@ -92,7 +93,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
       }
 
       final dio = Dio(BaseOptions(
-        baseUrl: 'http://10.0.2.2:8000/api',
+        baseUrl: ApiConfig.apiBaseUrl,
         connectTimeout: const Duration(seconds: 10),
         receiveTimeout: const Duration(seconds: 10),
         headers: {
