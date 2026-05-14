@@ -30,7 +30,10 @@ class _LeaderboardScreenState extends State<LeaderboardScreen> with SingleTicker
   int? _currentUserId;
   int? _currentUserRank;
   bool _isLoadingGlobal = true;
-  bool _isLoadingFriends = true;
+  bool _isLoadingFriends = false;
+  Future<void>? _currentUserLoadFuture;
+  Future<void>? _globalLoadFuture;
+  Future<void>? _friendsLoadFuture;
   static const _storage = FlutterSecureStorage();
 
   @override
@@ -54,22 +57,20 @@ class _LeaderboardScreenState extends State<LeaderboardScreen> with SingleTicker
 
   Future<Dio> _createDio() async {
     final token = await _storage.read(key: 'auth_token');
-
-    return Dio(
-      BaseOptions(
-        baseUrl: ApiConfig.apiBaseUrl,
-        connectTimeout: const Duration(seconds: 10),
-        receiveTimeout: const Duration(seconds: 10),
-        headers: <String, String>{
-          'Accept': 'application/json',
-          'Content-Type': 'application/json',
-          if (token != null && token.isNotEmpty) 'Authorization': 'Bearer $token',
-        },
-      ),
-    );
+    return ApiConfig.createDio(authToken: token);
   }
 
-  Future<void> _loadCurrentUser() async {
+  Future<void> _loadCurrentUser() {
+    final Future<void>? runningLoad = _currentUserLoadFuture;
+    if (runningLoad != null) return runningLoad;
+
+    final Future<void> load = _loadCurrentUserInternal();
+    _currentUserLoadFuture = load;
+    load.whenComplete(() => _currentUserLoadFuture = null);
+    return load;
+  }
+
+  Future<void> _loadCurrentUserInternal() async {
     try {
       final Dio dio = await _createDio();
       final Response<dynamic> response = await dio.get<dynamic>('/auth/me');
@@ -90,7 +91,17 @@ class _LeaderboardScreenState extends State<LeaderboardScreen> with SingleTicker
     }
   }
 
-  Future<void> _loadGlobal() async {
+  Future<void> _loadGlobal() {
+    final Future<void>? runningLoad = _globalLoadFuture;
+    if (runningLoad != null) return runningLoad;
+
+    final Future<void> load = _loadGlobalInternal();
+    _globalLoadFuture = load;
+    load.whenComplete(() => _globalLoadFuture = null);
+    return load;
+  }
+
+  Future<void> _loadGlobalInternal() async {
     if (mounted) {
       setState(() => _isLoadingGlobal = true);
     }
@@ -131,7 +142,17 @@ class _LeaderboardScreenState extends State<LeaderboardScreen> with SingleTicker
     }
   }
 
-  Future<void> _loadFriends() async {
+  Future<void> _loadFriends() {
+    final Future<void>? runningLoad = _friendsLoadFuture;
+    if (runningLoad != null) return runningLoad;
+
+    final Future<void> load = _loadFriendsInternal();
+    _friendsLoadFuture = load;
+    load.whenComplete(() => _friendsLoadFuture = null);
+    return load;
+  }
+
+  Future<void> _loadFriendsInternal() async {
     if (mounted) {
       setState(() => _isLoadingFriends = true);
     }

@@ -27,7 +27,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   bool _isLoading = true;
   bool _loadingCategories = true;
   bool _loadingSession = true;
-
+  Future<void>? _loadDataFuture;
 
   @override
   void initState() {
@@ -35,11 +35,23 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     _loadData();
   }
 
-  Future<void> _loadData() async {
+  Future<void> _loadData() {
+    final Future<void>? runningLoad = _loadDataFuture;
+    if (runningLoad != null) {
+      return runningLoad;
+    }
+
+    final Future<void> load = _loadDataInternal();
+    _loadDataFuture = load;
+    load.whenComplete(() => _loadDataFuture = null);
+    return load;
+  }
+
+  Future<void> _loadDataInternal() async {
     // ÉTAPE 1 : Afficher le cache immédiatement
     await _loadFromCache();
 
-    // ÉTAPE 2 : Charger depuis l'API en arrière-plan
+    // ÉTAPE 2 : Charger les données essentielles depuis l'API.
     await _loadFromApi();
   }
 
@@ -84,37 +96,32 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
 
   Future<void> _loadFromApi() async {
     try {
-      final token = await const FlutterSecureStorage()
-          .read(key: 'auth_token');
+      final token = await const FlutterSecureStorage().read(key: 'auth_token');
 
       if (token == null) {
         if (mounted) context.go('/auth');
         return;
       }
 
-      final dio = Dio(BaseOptions(
-        baseUrl: ApiConfig.apiBaseUrl,
-        connectTimeout: const Duration(seconds: 10),
-        receiveTimeout: const Duration(seconds: 10),
-        headers: {
-          'Accept': 'application/json',
-          'Content-Type': 'application/json',
-          'Authorization': 'Bearer $token',
-        },
-      ));
+      final dio = ApiConfig.createDio(authToken: token);
 
-      final results = await Future.wait([
-        dio.get('/auth/me'),
-        dio.get('/categories'),
-        dio.get('/sessions'),
+      if (mounted) {
+        setState(() {
+          _loadingCategories = _categories.isEmpty;
+          _loadingSession = _lastSession == null;
+          _isLoading = _user == null && _categories.isEmpty;
+        });
+      }
+
+      // Données essentielles pour rendre la Home : utilisateur + catégories.
+      // Elles partent en parallèle et ne sont plus bloquées par l'historique.
+      final results = await Future.wait<Response<dynamic>>(<Future<Response<dynamic>>>[
+        dio.get<dynamic>('/auth/me'),
+        dio.get<dynamic>('/categories'),
       ]);
 
       final userData = results[0].data['data'];
       final categoriesData = results[1].data['data'];
-      final sessionsData = results[2].data['data'];
-
-      final prefs = await SharedPreferences
-          .getInstance();
 
       if (!mounted) return;
 
@@ -127,13 +134,6 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
               .toList();
         }
 
-        final rawSession = sessionsData is List && sessionsData.isNotEmpty
-            ? sessionsData.first
-            : null;
-        if (rawSession != null && rawSession is Map) {
-          _lastSession = Map<String, dynamic>.from(rawSession);
-        }
-
         final rawUser = userData is Map && userData['user'] is Map
             ? userData['user']
             : userData;
@@ -141,30 +141,74 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
           _user = Map<String, dynamic>.from(rawUser);
         }
 
+        _loadingCategories = false;
         _isLoading = false;
       });
 
-      await prefs.setString('home_cache',
-          jsonEncode({
-            'user': _user,
-            'categories': _categories,
-            'last_session': _lastSession,
-          }));
+      await _saveHomeCache();
+      await _loadLastSession(dio);
     } on DioException catch (e) {
       debugPrint('API ERROR: $e');
       if (e.response?.statusCode == 401) {
-        await const FlutterSecureStorage()
-            .delete(key: 'auth_token');
+        await const FlutterSecureStorage().delete(key: 'auth_token');
         if (mounted) context.go('/auth');
         return;
       }
-      if (mounted) setState(() =>
-          _isLoading = false);
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+          _loadingCategories = false;
+          _loadingSession = false;
+        });
+      }
     } catch (e) {
       debugPrint('ERROR: $e');
-      if (mounted) setState(() =>
-          _isLoading = false);
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+          _loadingCategories = false;
+          _loadingSession = false;
+        });
+      }
     }
+  }
+
+  Future<void> _loadLastSession(Dio dio) async {
+    try {
+      final response = await dio.get<dynamic>('/sessions');
+      final sessionsData = response.data['data'];
+      final rawSession = sessionsData is List && sessionsData.isNotEmpty
+          ? sessionsData.first
+          : null;
+
+      if (!mounted) return;
+
+      setState(() {
+        if (rawSession != null && rawSession is Map) {
+          _lastSession = Map<String, dynamic>.from(rawSession);
+        } else {
+          _lastSession = null;
+        }
+        _loadingSession = false;
+      });
+
+      await _saveHomeCache();
+    } catch (e) {
+      debugPrint('SESSION API ERROR: $e');
+      if (mounted) setState(() => _loadingSession = false);
+    }
+  }
+
+  Future<void> _saveHomeCache() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(
+      'home_cache',
+      jsonEncode({
+        'user': _user,
+        'categories': _categories,
+        'last_session': _lastSession,
+      }),
+    );
   }
 
   String _getInitials(String name) {
@@ -561,9 +605,16 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
         ),
         const SizedBox(height: 12),
         if (_loadingCategories)
-          const Center(
-            child: CircularProgressIndicator(
-              color: Color(0xFFF77F00),
+          const Padding(
+            padding: EdgeInsets.symmetric(horizontal: 20),
+            child: Column(
+              children: <Widget>[
+                _SkeletonBox(width: double.infinity, height: 72, radius: 16),
+                SizedBox(height: 12),
+                _SkeletonBox(width: double.infinity, height: 72, radius: 16),
+                SizedBox(height: 12),
+                _SkeletonBox(width: double.infinity, height: 72, radius: 16),
+              ],
             ),
           )
         else if (previewCategories.isEmpty)
@@ -675,10 +726,9 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
 
   Widget _buildLastSession() {
     if (_loadingSession) {
-      return const Center(
-        child: CircularProgressIndicator(
-          color: Color(0xFFF77F00),
-        ),
+      return const Padding(
+        padding: EdgeInsets.symmetric(horizontal: 20),
+        child: _SkeletonBox(width: double.infinity, height: 100, radius: 16),
       );
     }
 
