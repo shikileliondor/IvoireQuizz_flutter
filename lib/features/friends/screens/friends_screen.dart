@@ -4,6 +4,8 @@ import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:google_fonts/google_fonts.dart';
 
+import '../../../core/config/api_config.dart';
+
 const _orange = Color(0xFFF77F00);
 const _textDark = Color(0xFF1A1A2E);
 const _textGray = Color(0xFF6B7280);
@@ -35,7 +37,7 @@ class _FriendsScreenState extends State<FriendsScreen> {
     final token = await _storage.read(key: 'auth_token');
     return Dio(
       BaseOptions(
-        baseUrl: 'http://10.0.2.2:8000/api',
+        baseUrl: ApiConfig.apiBaseUrl,
         connectTimeout: const Duration(seconds: 10),
         receiveTimeout: const Duration(seconds: 10),
         headers: <String, String>{

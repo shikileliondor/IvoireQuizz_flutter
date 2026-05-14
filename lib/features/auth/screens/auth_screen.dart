@@ -6,6 +6,8 @@ import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 
+import '../../../core/config/api_config.dart';
+
 class AuthScreen extends StatefulWidget {
   final bool showLogin;
   const AuthScreen({super.key, this.showLogin = false});
@@ -62,7 +64,7 @@ class _AuthScreenState extends State<AuthScreen>
   Dio _createDio() {
     return Dio(
       BaseOptions(
-        baseUrl: 'http://10.0.2.2:8000/api',
+        baseUrl: ApiConfig.apiBaseUrl,
         connectTimeout: const Duration(seconds: 10),
         receiveTimeout: const Duration(seconds: 10),
         headers: {
