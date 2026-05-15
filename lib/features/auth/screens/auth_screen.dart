@@ -1,6 +1,7 @@
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -62,6 +63,35 @@ class _AuthScreenState extends State<AuthScreen>
   }
 
   Dio _createDio() => ApiConfig.createDio();
+
+  static const String _configuredGoogleWebClientId =
+      String.fromEnvironment('GOOGLE_WEB_CLIENT_ID');
+
+  static String? get _googleWebClientId =>
+      _configuredGoogleWebClientId.trim().isEmpty
+          ? null
+          : _configuredGoogleWebClientId.trim();
+
+  static const String _missingGoogleIdTokenMessage =
+      'Impossible de récupérer le token Google. '
+      'Configurez GOOGLE_WEB_CLIENT_ID avec l’ID client Web OAuth Google.';
+
+  String _googlePlatformErrorMessage(PlatformException error) {
+    if (error.code == 'sign_in_failed') {
+      return 'Google Sign In a échoué. Vérifiez l’ID client Web OAuth, '
+          'le nom du package Android et le SHA-1/SHA-256 configurés '
+          'dans Google Cloud.';
+    }
+
+    if (error.code == 'network_error') {
+      return 'Connexion Google impossible. Vérifiez votre connexion internet '
+          'puis réessayez.';
+    }
+
+    return error.message?.isNotEmpty == true
+        ? 'Erreur Google Sign In : ${error.message}'
+        : 'Erreur Google Sign In (${error.code})';
+  }
 
   Future<void> _register() async {
     setState(() {
@@ -192,6 +222,7 @@ class _AuthScreenState extends State<AuthScreen>
     try {
       final googleSignIn = GoogleSignIn(
         scopes: const <String>['email', 'profile'],
+        serverClientId: _googleWebClientId,
       );
       final account = await googleSignIn.signIn();
       if (account == null) {
@@ -202,8 +233,7 @@ class _AuthScreenState extends State<AuthScreen>
       final idToken = auth.idToken;
       if (idToken == null) {
         setState(() {
-          _errorMessage =
-              'Impossible de récupérer le token Google';
+          _errorMessage = _missingGoogleIdTokenMessage;
           _isLoading = false;
         });
         return;
@@ -226,6 +256,8 @@ class _AuthScreenState extends State<AuthScreen>
         message = e.response!.data['message'];
       }
       setState(() => _errorMessage = message);
+    } on PlatformException catch (e) {
+      setState(() => _errorMessage = _googlePlatformErrorMessage(e));
     } catch (e) {
       setState(() => _errorMessage = 'Erreur Google Sign In');
     } finally {
