@@ -23,7 +23,8 @@ class LeaderboardScreen extends StatefulWidget {
   State<LeaderboardScreen> createState() => _LeaderboardScreenState();
 }
 
-class _LeaderboardScreenState extends State<LeaderboardScreen> with SingleTickerProviderStateMixin {
+class _LeaderboardScreenState extends State<LeaderboardScreen>
+    with SingleTickerProviderStateMixin {
   late TabController _tabController;
   List<Map<String, dynamic>> _globalList = <Map<String, dynamic>>[];
   List<Map<String, dynamic>> _friendsList = <Map<String, dynamic>>[];
@@ -126,28 +127,20 @@ class _LeaderboardScreenState extends State<LeaderboardScreen> with SingleTicker
       final Response<dynamic> response = await dio.get<dynamic>('/leaderboard/global');
       if (!mounted) return;
       final dynamic payload = response.data;
-      final dynamic data = payload is Map<String, dynamic> ? payload['data'] : null;
-
-      List<dynamic> users = <dynamic>[];
-      int? rank;
-
-      if (data is Map) {
-        users = (data['data'] ?? data['users'] ?? <dynamic>[]) as List<dynamic>;
-        rank = int.tryParse((data['current_user_rank'] ?? '').toString());
-      } else if (data is List) {
-        users = data;
-      }
-
-      final List<Map<String, dynamic>> mapped = users
-          .whereType<Map>()
-          .map((Map<dynamic, dynamic> e) => e.map(
-                (dynamic key, dynamic value) => MapEntry(key.toString(), value),
-              ))
-          .toList();
+      final List<Map<String, dynamic>> users = _extractLeaderboardUsers(
+        payload,
+        preferredKeys: const <String>[
+          'leaderboard',
+          'rankings',
+          'users',
+          'players',
+        ],
+      );
+      final int? rank = _extractCurrentUserRank(payload);
 
       if (!mounted) return;
       setState(() {
-        _globalList = mapped;
+        _globalList = _sortByScore(users);
         _currentUserRank = rank;
         _isLoadingGlobal = false;
         _globalLoadFuture = null;
@@ -180,28 +173,10 @@ class _LeaderboardScreenState extends State<LeaderboardScreen> with SingleTicker
       final Dio dio = await _createDio();
       if (!mounted) return;
 
-      final Response<dynamic> response = await dio.get<dynamic>('/leaderboard/friends');
-      if (!mounted) return;
-      final dynamic payload = response.data;
-      final dynamic data = payload is Map<String, dynamic> ? payload['data'] : null;
-
-      List<dynamic> users = <dynamic>[];
-      if (data is List) {
-        users = data;
-      } else if (data is Map) {
-        users = (data['data'] ?? data['users'] ?? <dynamic>[]) as List<dynamic>;
-      }
-
-      final List<Map<String, dynamic>> mapped = users
-          .whereType<Map>()
-          .map((Map<dynamic, dynamic> e) => e.map(
-                (dynamic key, dynamic value) => MapEntry(key.toString(), value),
-              ))
-          .toList();
-
+      final List<Map<String, dynamic>> friends = await _fetchFriendsRanking(dio);
       if (!mounted) return;
       setState(() {
-        _friendsList = mapped;
+        _friendsList = _sortByScore(friends);
         _isLoadingFriends = false;
         _friendsLoadFuture = null;
       });
@@ -213,6 +188,200 @@ class _LeaderboardScreenState extends State<LeaderboardScreen> with SingleTicker
         _friendsLoadFuture = null;
       });
     }
+  }
+
+  Future<List<Map<String, dynamic>>> _fetchFriendsRanking(Dio dio) async {
+    try {
+      final Response<dynamic> leaderboardResponse =
+          await dio.get<dynamic>('/leaderboard/friends');
+      final List<Map<String, dynamic>> leaderboardUsers = _extractLeaderboardUsers(
+        leaderboardResponse.data,
+        preferredKeys: const <String>[
+          'leaderboard',
+          'rankings',
+          'friends',
+          'users',
+          'players',
+        ],
+      );
+
+      if (leaderboardUsers.isNotEmpty) {
+        return leaderboardUsers;
+      }
+    } catch (e) {
+      debugPrint('FRIENDS LEADERBOARD ERROR: $e');
+    }
+
+    final Response<dynamic> friendsResponse = await dio.get<dynamic>('/friends');
+    return _extractLeaderboardUsers(
+      friendsResponse.data,
+      preferredKeys: const <String>['friends'],
+    );
+  }
+
+  List<Map<String, dynamic>> _extractLeaderboardUsers(
+    dynamic responseData, {
+    List<String> preferredKeys = const <String>[],
+  }) {
+    final dynamic listData = _findListPayload(responseData, preferredKeys);
+    if (listData is! List) {
+      return <Map<String, dynamic>>[];
+    }
+
+    return listData
+        .whereType<Map>()
+        .map((Map<dynamic, dynamic> item) => _normalizeLeaderboardUser(item))
+        .where((Map<String, dynamic> user) => user.isNotEmpty)
+        .toList();
+  }
+
+  dynamic _findListPayload(dynamic payload, List<String> preferredKeys) {
+    if (payload is List) return payload;
+    if (payload is! Map) return null;
+
+    final Map<String, dynamic> normalized = _normalizeMap(payload);
+    for (final String key in <String>[
+      ...preferredKeys,
+      'data',
+      'items',
+      'results',
+      'leaderboard',
+      'rankings',
+      'users',
+      'players',
+      'friends',
+    ]) {
+      final dynamic value = normalized[key];
+      if (value is List) return value;
+      if (value is Map) {
+        final dynamic nested = _findListPayload(value, preferredKeys);
+        if (nested is List) return nested;
+      }
+    }
+
+    return null;
+  }
+
+  Map<String, dynamic> _normalizeLeaderboardUser(Map<dynamic, dynamic> rawItem) {
+    final Map<String, dynamic> item = _normalizeMap(rawItem);
+    final Map<String, dynamic> nestedUser = _extractNestedUser(item);
+    final Map<String, dynamic> user = <String, dynamic>{
+      ...nestedUser,
+      if (nestedUser.isEmpty) ...item,
+    };
+
+    final int score = _extractScore(user, fallback: _extractScore(item));
+    if (score > 0) {
+      user['total_score'] = score;
+    } else {
+      user['total_score'] =
+          user['total_score'] ?? user['score'] ?? item['total_score'] ?? item['score'] ?? 0;
+    }
+
+    user['id'] = user['id'] ?? item['user_id'] ?? item['friend_id'] ?? item['id'];
+    user['name'] = _extractName(user, fallback: _extractName(item));
+    user['rank'] = user['rank'] ?? item['rank'] ?? item['position'];
+    return user;
+  }
+
+  Map<String, dynamic> _extractNestedUser(Map<String, dynamic> item) {
+    for (final String key in const <String>[
+      'user',
+      'player',
+      'friend',
+      'recipient',
+      'requester',
+      'profile',
+    ]) {
+      final dynamic value = item[key];
+      if (value is Map) {
+        return _normalizeMap(value);
+      }
+    }
+
+    return <String, dynamic>{};
+  }
+
+  Map<String, dynamic> _normalizeMap(Map<dynamic, dynamic> map) {
+    return map.map(
+      (dynamic key, dynamic value) => MapEntry<String, dynamic>(
+        key.toString(),
+        value,
+      ),
+    );
+  }
+
+  List<Map<String, dynamic>> _sortByScore(List<Map<String, dynamic>> users) {
+    final List<Map<String, dynamic>> sorted = users
+        .map((Map<String, dynamic> user) => Map<String, dynamic>.from(user))
+        .toList();
+
+    sorted.sort((Map<String, dynamic> a, Map<String, dynamic> b) {
+      final int scoreCompare = _extractScore(b).compareTo(_extractScore(a));
+      if (scoreCompare != 0) return scoreCompare;
+
+      return _extractName(a).toLowerCase().compareTo(_extractName(b).toLowerCase());
+    });
+
+    return sorted;
+  }
+
+  int _extractScore(Map<String, dynamic> user, {int fallback = 0}) {
+    for (final String key in const <String>[
+      'total_score',
+      'score',
+      'points',
+      'xp',
+      'best_score',
+      'quiz_score',
+    ]) {
+      final dynamic value = user[key];
+      final int? parsed = int.tryParse((value ?? '').toString());
+      if (parsed != null) return parsed;
+    }
+
+    return fallback;
+  }
+
+  String _extractName(Map<String, dynamic> user, {String fallback = 'Joueur'}) {
+    for (final String key in const <String>[
+      'name',
+      'username',
+      'full_name',
+      'display_name',
+      'pseudo',
+      'email',
+    ]) {
+      final dynamic value = user[key];
+      if (value != null && value.toString().trim().isNotEmpty) {
+        return value.toString();
+      }
+    }
+
+    return fallback;
+  }
+
+  int? _extractCurrentUserRank(dynamic payload) {
+    if (payload is! Map) return null;
+
+    final Map<String, dynamic> normalized = _normalizeMap(payload);
+    for (final String key in const <String>[
+      'current_user_rank',
+      'currentUserRank',
+      'my_rank',
+      'rank',
+      'position',
+    ]) {
+      final int? rank = int.tryParse((normalized[key] ?? '').toString());
+      if (rank != null) return rank;
+    }
+
+    final dynamic data = normalized['data'];
+    if (data is Map) {
+      return _extractCurrentUserRank(data);
+    }
+
+    return null;
   }
 
   @override
@@ -247,7 +416,11 @@ class _LeaderboardScreenState extends State<LeaderboardScreen> with SingleTicker
             children: <Widget>[
               IconButton(
                 onPressed: () => context.pop(),
-                icon: const Icon(Icons.arrow_back_ios_new_rounded, color: _textDark, size: 20),
+                icon: const Icon(
+                  Icons.arrow_back_ios_new_rounded,
+                  color: _textDark,
+                  size: 20,
+                ),
                 tooltip: 'Retour',
               ),
               const SizedBox(width: 8),
@@ -334,7 +507,8 @@ class _LeaderboardScreenState extends State<LeaderboardScreen> with SingleTicker
         itemBuilder: (BuildContext context, int index) {
           final Map<String, dynamic> user = _globalList[index];
           final int rank = index + 1;
-          final bool isCurrentUser = user['id']?.toString() == _currentUserId?.toString();
+          final bool isCurrentUser =
+              user['id']?.toString() == _currentUserId?.toString();
 
           return _buildPlayerRow(
             user: user,
@@ -380,10 +554,10 @@ class _LeaderboardScreenState extends State<LeaderboardScreen> with SingleTicker
             ),
             const SizedBox(height: 20),
             TextButton.icon(
-              onPressed: _loadFriends,
-              icon: const Icon(Icons.refresh_rounded, color: _orange),
+              onPressed: () => context.go('/friends'),
+              icon: const Icon(Icons.person_add_alt_1_rounded, color: _orange),
               label: Text(
-                'Actualiser',
+                'Ajouter des amis',
                 style: GoogleFonts.nunito(
                   color: _orange,
                   fontWeight: FontWeight.w700,
@@ -404,7 +578,8 @@ class _LeaderboardScreenState extends State<LeaderboardScreen> with SingleTicker
         itemBuilder: (BuildContext context, int index) {
           final Map<String, dynamic> user = _friendsList[index];
           final int rank = index + 1;
-          final bool isCurrentUser = user['id']?.toString() == _currentUserId?.toString();
+          final bool isCurrentUser =
+              user['id']?.toString() == _currentUserId?.toString();
 
           return _buildPlayerRow(
             user: user,
@@ -423,8 +598,8 @@ class _LeaderboardScreenState extends State<LeaderboardScreen> with SingleTicker
     required bool isCurrentUser,
     required int index,
   }) {
-    final String name = (user['name'] ?? user['username'] ?? 'Joueur').toString();
-    final int score = int.tryParse((user['total_score'] ?? user['score'] ?? 0).toString()) ?? 0;
+    final String name = _extractName(user);
+    final int score = _extractScore(user);
     final String initials = _getInitials(name);
 
     Widget rankWidget;
