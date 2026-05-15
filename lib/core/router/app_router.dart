@@ -31,54 +31,76 @@ final Provider<GoRouter> routerProvider = Provider<GoRouter>((Ref ref) {
         path: '/auth',
         builder: (BuildContext context, GoRouterState state) => const AuthScreen(),
       ),
-      ShellRoute(
-        builder: (BuildContext context, GoRouterState state, Widget child) {
-          return MainScreen(child: child);
+      StatefulShellRoute.indexedStack(
+        builder: (
+          BuildContext context,
+          GoRouterState state,
+          StatefulNavigationShell navigationShell,
+        ) {
+          return MainScreen(navigationShell: navigationShell);
         },
-        routes: <RouteBase>[
-          GoRoute(
-            path: '/home',
-            builder: (BuildContext context, GoRouterState state) => const HomeScreen(),
-          ),
-          GoRoute(
-            path: '/home/categories',
-            builder: (BuildContext context, GoRouterState state) {
-              final dynamic extra = state.extra;
-              final List<Map<String, dynamic>> categories;
-              final String selectedMode;
+        branches: <StatefulShellBranch>[
+          StatefulShellBranch(
+            routes: <RouteBase>[
+              GoRoute(
+                path: '/home',
+                builder: (BuildContext context, GoRouterState state) => const HomeScreen(),
+                routes: <RouteBase>[
+                  GoRoute(
+                    path: 'categories',
+                    builder: (BuildContext context, GoRouterState state) {
+                      final dynamic extra = state.extra;
+                      final List<Map<String, dynamic>> categories;
+                      final String selectedMode;
 
-              if (extra is Map) {
-                final dynamic rawCategories = extra['categories'];
-                categories = rawCategories is List
-                    ? rawCategories
-                        .whereType<Map>()
-                        .map((dynamic e) => Map<String, dynamic>.from(e as Map))
-                        .toList()
-                    : <Map<String, dynamic>>[];
-                final dynamic rawMode = extra['selected_mode'];
-                selectedMode = rawMode is String ? rawMode : 'category';
-              } else {
-                categories = <Map<String, dynamic>>[];
-                selectedMode = 'category';
-              }
+                      if (extra is Map) {
+                        final dynamic rawCategories = extra['categories'];
+                        categories = rawCategories is List
+                            ? rawCategories
+                                .whereType<Map>()
+                                .map((dynamic e) => Map<String, dynamic>.from(e as Map))
+                                .toList()
+                            : <Map<String, dynamic>>[];
+                        final dynamic rawMode = extra['selected_mode'];
+                        selectedMode = rawMode is String ? rawMode : 'category';
+                      } else {
+                        categories = <Map<String, dynamic>>[];
+                        selectedMode = 'category';
+                      }
 
-              return AllCategoriesScreen(
-                categories: categories,
-                selectedMode: selectedMode,
-              );
-            },
+                      return AllCategoriesScreen(
+                        categories: categories,
+                        selectedMode: selectedMode,
+                      );
+                    },
+                  ),
+                ],
+              ),
+            ],
           ),
-          GoRoute(
-            path: '/leaderboard',
-            builder: (BuildContext context, GoRouterState state) => const LeaderboardScreen(),
+          StatefulShellBranch(
+            routes: <RouteBase>[
+              GoRoute(
+                path: '/leaderboard',
+                builder: (BuildContext context, GoRouterState state) => const LeaderboardScreen(),
+              ),
+            ],
           ),
-          GoRoute(
-            path: '/friends',
-            builder: (BuildContext context, GoRouterState state) => const FriendsScreen(),
+          StatefulShellBranch(
+            routes: <RouteBase>[
+              GoRoute(
+                path: '/friends',
+                builder: (BuildContext context, GoRouterState state) => const FriendsScreen(),
+              ),
+            ],
           ),
-          GoRoute(
-            path: '/profile',
-            builder: (BuildContext context, GoRouterState state) => const ProfileScreen(),
+          StatefulShellBranch(
+            routes: <RouteBase>[
+              GoRoute(
+                path: '/profile',
+                builder: (BuildContext context, GoRouterState state) => const ProfileScreen(),
+              ),
+            ],
           ),
         ],
       ),
@@ -151,35 +173,24 @@ class SplashScreen extends StatelessWidget {
 //  MAIN SCREEN  (structure identique)
 // ══════════════════════════════════════════════
 class MainScreen extends StatelessWidget {
-  const MainScreen({required this.child, super.key});
+  const MainScreen({required this.navigationShell, super.key});
 
-  final Widget child;
+  final StatefulNavigationShell navigationShell;
 
   @override
   Widget build(BuildContext context) {
-    final String location = GoRouterState.of(context).uri.toString();
-
     return Scaffold(
-      body: child,
+      body: navigationShell,
       bottomNavigationBar: _AnimatedNavBar(
-        selectedIndex: _selectedIndex(location),
+        selectedIndex: navigationShell.currentIndex,
         onTap: (int index) {
-          switch (index) {
-            case 0: context.go('/home');        return;
-            case 1: context.go('/leaderboard'); return;
-            case 2: context.go('/friends');     return;
-            case 3: context.go('/profile');     return;
-          }
+          navigationShell.goBranch(
+            index,
+            initialLocation: index == navigationShell.currentIndex,
+          );
         },
       ),
     );
-  }
-
-  int _selectedIndex(String location) {
-    if (location.startsWith('/leaderboard')) return 1;
-    if (location.startsWith('/friends'))     return 2;
-    if (location.startsWith('/profile'))     return 3;
-    return 0;
   }
 }
 
@@ -193,11 +204,11 @@ class _AnimatedNavBar extends StatelessWidget {
   final int selectedIndex;
   final ValueChanged<int> onTap;
 
-  static const List<NavigationDestination> _destinations = [
-    NavigationDestination(icon: Icon(Icons.home_outlined),        label: 'Accueil'),
-    NavigationDestination(icon: Icon(Icons.emoji_events_outlined), label: 'Classement'),
-    NavigationDestination(icon: Icon(Icons.group_outlined),       label: 'Amis'),
-    NavigationDestination(icon: Icon(Icons.person_outline),       label: 'Profil'),
+  static const List<({IconData icon, String label})> _destinations = [
+    (icon: Icons.home_outlined, label: 'Accueil'),
+    (icon: Icons.emoji_events_outlined, label: 'Classement'),
+    (icon: Icons.group_outlined, label: 'Amis'),
+    (icon: Icons.person_outline, label: 'Profil'),
   ];
 
   @override
@@ -211,7 +222,7 @@ class _AnimatedNavBar extends StatelessWidget {
         final bool active = i == selectedIndex;
         return NavigationDestination(
           icon: _BounceIcon(
-            icon: _destinations[i].icon as Icon,
+            icon: _destinations[i].icon,
             active: active,
           ),
           label: _destinations[i].label,
@@ -225,7 +236,7 @@ class _AnimatedNavBar extends StatelessWidget {
 class _BounceIcon extends StatefulWidget {
   const _BounceIcon({required this.icon, required this.active});
 
-  final Icon icon;
+  final IconData icon;
   final bool active;
 
   @override
@@ -269,7 +280,7 @@ class _BounceIconState extends State<_BounceIcon>
       builder: (_, __) => Transform.scale(
         scale: widget.active ? _scale.value : 1.0,
         child: Icon(
-          widget.icon.icon,
+          widget.icon,
           color: widget.active ? AppColors.orange : null,
         ),
       ),
