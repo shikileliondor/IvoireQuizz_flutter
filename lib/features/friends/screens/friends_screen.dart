@@ -25,6 +25,7 @@ class _FriendsScreenState extends State<FriendsScreen> {
   List<Map<String, dynamic>> _friends = <Map<String, dynamic>>[];
   List<Map<String, dynamic>> _requests = <Map<String, dynamic>>[];
   bool _isLoading = true;
+  bool _isAddingFriend = false;
   Future<void>? _loadDataFuture;
   static const _storage = FlutterSecureStorage();
 
@@ -52,6 +53,17 @@ class _FriendsScreenState extends State<FriendsScreen> {
     final Future<void> load = _loadFriends();
     _loadDataFuture = load;
     return load;
+  }
+
+  Future<void> _reloadFriendsAfterMutation() async {
+    final Future<void>? runningLoad = _loadDataFuture;
+    if (runningLoad != null) {
+      await runningLoad;
+      if (!mounted) return;
+    }
+
+    await _loadFriendsOnce();
+    if (!mounted) return;
   }
 
   Future<void> _loadFriends() async {
@@ -103,16 +115,41 @@ class _FriendsScreenState extends State<FriendsScreen> {
         .toList();
   }
 
-  Future<void> _addFriend(String friendCode) async {
+  Future<bool> _addFriend(String friendCode) async {
+    final code = friendCode.trim().toUpperCase();
+
+    if (code.isEmpty) {
+      if (!mounted) return false;
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            'Veuillez entrer un code ami.',
+            style: GoogleFonts.nunito(),
+          ),
+          backgroundColor: _incorrect,
+        ),
+      );
+      return false;
+    }
+
+    if (_isAddingFriend) return false;
+
+    if (!mounted) return false;
+    setState(() {
+      _isAddingFriend = true;
+    });
+
     try {
       final Dio dio = await _createDio();
-      if (!mounted) return;
+      if (!mounted) return false;
 
       await dio.post<dynamic>(
         '/friends/add',
-        data: <String, String>{'friend_code': friendCode},
+        data: <String, String>{'friend_code': code},
       );
-      if (!context.mounted) return;
+      if (!mounted) return false;
+      if (!context.mounted) return false;
 
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
@@ -124,16 +161,18 @@ class _FriendsScreenState extends State<FriendsScreen> {
         ),
       );
 
-      await _loadFriendsOnce();
+      await _reloadFriendsAfterMutation();
+      if (!mounted) return false;
+
+      return true;
     } on DioException catch (e) {
-      if (!context.mounted) {
-        return;
-      }
+      if (!mounted) return false;
+      if (!context.mounted) return false;
 
       final responseData = e.response?.data;
       final message = responseData is Map<String, dynamic>
-          ? (responseData['message']?.toString() ?? 'Erreur lors de l\'ajout')
-          : 'Erreur lors de l\'ajout';
+          ? (responseData['message']?.toString() ?? 'Erreur lors de l'ajout')
+          : 'Erreur lors de l'ajout';
 
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
@@ -144,6 +183,28 @@ class _FriendsScreenState extends State<FriendsScreen> {
           backgroundColor: _incorrect,
         ),
       );
+      return false;
+    } catch (e) {
+      debugPrint('ADD FRIEND ERROR: $e');
+      if (!mounted) return false;
+      if (!context.mounted) return false;
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            'Impossible d’envoyer la demande.',
+            style: GoogleFonts.nunito(),
+          ),
+          backgroundColor: _incorrect,
+        ),
+      );
+      return false;
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isAddingFriend = false;
+        });
+      }
     }
   }
 
@@ -155,7 +216,8 @@ class _FriendsScreenState extends State<FriendsScreen> {
       await dio.put<dynamic>('/friends/$id/accept');
       if (!mounted) return;
 
-      await _loadFriendsOnce();
+      await _reloadFriendsAfterMutation();
+      if (!mounted) return;
     } catch (e) {
       debugPrint('ACCEPT ERROR: $e');
     }
@@ -169,7 +231,8 @@ class _FriendsScreenState extends State<FriendsScreen> {
       await dio.delete<dynamic>('/friends/$id');
       if (!mounted) return;
 
-      await _loadFriendsOnce();
+      await _reloadFriendsAfterMutation();
+      if (!mounted) return;
     } catch (e) {
       debugPrint('DELETE ERROR: $e');
     }
@@ -177,6 +240,7 @@ class _FriendsScreenState extends State<FriendsScreen> {
 
   void _showAddFriendModal() {
     final controller = TextEditingController();
+    bool isSubmitting = false;
 
     showModalBottomSheet<void>(
       context: context,
@@ -185,109 +249,151 @@ class _FriendsScreenState extends State<FriendsScreen> {
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
       ),
-      builder: (modalContext) => Padding(
-        padding: EdgeInsets.only(
-          bottom: MediaQuery.of(modalContext).viewInsets.bottom,
-        ),
-        child: Container(
-          padding: const EdgeInsets.all(24),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: <Widget>[
-              Container(
-                width: 40,
-                height: 4,
-                decoration: BoxDecoration(
-                  color: _neutral,
-                  borderRadius: BorderRadius.circular(2),
-                ),
-              ),
-              const SizedBox(height: 20),
-              Image.asset(
-                'assets/avecfodn.jpeg',
-                height: 80,
-                errorBuilder: (_, __, ___) => const SizedBox.shrink(),
-              ),
-              const SizedBox(height: 16),
-              Text(
-                'Ajouter un ami',
-                style: GoogleFonts.nunito(
-                  fontSize: 20,
-                  fontWeight: FontWeight.w800,
-                  color: _textDark,
-                ),
-              ),
-              const SizedBox(height: 8),
-              Text(
-                'Entre le code de ton ami',
-                style: GoogleFonts.nunito(
-                  fontSize: 14,
-                  color: _textGray,
-                ),
-              ),
-              const SizedBox(height: 20),
-              TextField(
-                controller: controller,
-                textCapitalization: TextCapitalization.characters,
-                maxLength: 6,
-                textAlign: TextAlign.center,
-                style: GoogleFonts.nunito(
-                  fontSize: 24,
-                  fontWeight: FontWeight.w800,
-                  letterSpacing: 8,
-                  color: _textDark,
-                ),
-                decoration: InputDecoration(
-                  hintText: 'ABOU42',
-                  hintStyle: GoogleFonts.nunito(
-                    fontSize: 24,
-                    letterSpacing: 8,
+      builder: (_) => StatefulBuilder(
+        builder: (sheetContext, setModalState) => Padding(
+          padding: EdgeInsets.only(
+            bottom: MediaQuery.of(sheetContext).viewInsets.bottom,
+          ),
+          child: Container(
+            padding: const EdgeInsets.all(24),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: <Widget>[
+                Container(
+                  width: 40,
+                  height: 4,
+                  decoration: BoxDecoration(
                     color: _neutral,
-                  ),
-                  filled: true,
-                  fillColor: _cardBg,
-                  counterText: '',
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(14),
-                    borderSide: const BorderSide(color: _neutral),
-                  ),
-                  focusedBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(14),
-                    borderSide: const BorderSide(color: _orange, width: 2),
+                    borderRadius: BorderRadius.circular(2),
                   ),
                 ),
-              ),
-              const SizedBox(height: 20),
-              SizedBox(
-                width: double.infinity,
-                height: 56,
-                child: ElevatedButton(
-                  onPressed: () {
-                    final code = controller.text.trim().toUpperCase();
-                    if (code.length == 6) {
-                      Navigator.pop(modalContext);
-                      _addFriend(code);
-                    }
-                  },
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: _orange,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(16),
-                    ),
-                    elevation: 0,
+                const SizedBox(height: 20),
+                Image.asset(
+                  'assets/avecfodn.jpeg',
+                  height: 80,
+                  errorBuilder: (_, __, ___) => const SizedBox.shrink(),
+                ),
+                const SizedBox(height: 16),
+                Text(
+                  'Ajouter un ami',
+                  style: GoogleFonts.nunito(
+                    fontSize: 20,
+                    fontWeight: FontWeight.w800,
+                    color: _textDark,
                   ),
-                  child: Text(
-                    'Ajouter',
-                    style: GoogleFonts.nunito(
-                      fontSize: 16,
-                      fontWeight: FontWeight.w700,
-                      color: Colors.white,
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  'Entre le code de ton ami',
+                  style: GoogleFonts.nunito(
+                    fontSize: 14,
+                    color: _textGray,
+                  ),
+                ),
+                const SizedBox(height: 20),
+                TextField(
+                  controller: controller,
+                  enabled: !isSubmitting,
+                  textCapitalization: TextCapitalization.characters,
+                  maxLength: 6,
+                  textAlign: TextAlign.center,
+                  style: GoogleFonts.nunito(
+                    fontSize: 24,
+                    fontWeight: FontWeight.w800,
+                    letterSpacing: 8,
+                    color: _textDark,
+                  ),
+                  decoration: InputDecoration(
+                    hintText: 'ABOU42',
+                    hintStyle: GoogleFonts.nunito(
+                      fontSize: 24,
+                      letterSpacing: 8,
+                      color: _neutral,
+                    ),
+                    filled: true,
+                    fillColor: _cardBg,
+                    counterText: '',
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(14),
+                      borderSide: const BorderSide(color: _neutral),
+                    ),
+                    focusedBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(14),
+                      borderSide: const BorderSide(color: _orange, width: 2),
                     ),
                   ),
                 ),
-              ),
-              const SizedBox(height: 8),
-            ],
+                const SizedBox(height: 20),
+                SizedBox(
+                  width: double.infinity,
+                  height: 56,
+                  child: ElevatedButton(
+                    onPressed: isSubmitting
+                        ? null
+                        : () async {
+                            final code = controller.text.trim().toUpperCase();
+                            if (code.length != 6) {
+                              if (!mounted) return;
+
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(
+                                  content: Text(
+                                    'Veuillez entrer un code ami valide.',
+                                    style: GoogleFonts.nunito(),
+                                  ),
+                                  backgroundColor: _incorrect,
+                                ),
+                              );
+                              return;
+                            }
+
+                            setModalState(() {
+                              isSubmitting = true;
+                            });
+
+                            final bool added = await _addFriend(code);
+                            if (!mounted) return;
+                            if (!sheetContext.mounted) return;
+
+                            if (added) {
+                              controller.clear();
+                              Navigator.of(sheetContext).pop();
+                              return;
+                            }
+
+                            setModalState(() {
+                              isSubmitting = false;
+                            });
+                          },
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: _orange,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(16),
+                      ),
+                      elevation: 0,
+                    ),
+                    child: isSubmitting
+                        ? const SizedBox(
+                            width: 22,
+                            height: 22,
+                            child: CircularProgressIndicator(
+                              color: Colors.white,
+                              strokeWidth: 2.5,
+                            ),
+                          )
+                        : Text(
+                            'Ajouter',
+                            style: GoogleFonts.nunito(
+                              fontSize: 16,
+                              fontWeight: FontWeight.w700,
+                              color: Colors.white,
+                            ),
+                          ),
+                  ),
+                ),
+                const SizedBox(height: 8),
+              ],
+            ),
           ),
         ),
       ),
