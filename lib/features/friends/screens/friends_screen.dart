@@ -171,8 +171,8 @@ class _FriendsScreenState extends State<FriendsScreen> {
 
       final responseData = e.response?.data;
       final message = responseData is Map<String, dynamic>
-          ? (responseData['message']?.toString() ?? 'Erreur lors de l'ajout')
-          : 'Erreur lors de l'ajout';
+          ? (responseData['message']?.toString() ?? "Erreur lors de l'ajout")
+          : "Erreur lors de l'ajout";
 
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
