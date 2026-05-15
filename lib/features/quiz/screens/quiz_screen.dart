@@ -452,7 +452,113 @@ class _QuizScreenState extends State<QuizScreen> {
     );
   }
 
-  Widget _buildQuestion() {
+  Widget _buildQuestionCounter() {
+    return Text(
+      'Question ${_currentIndex + 1} sur ${_questions.length}',
+      style: GoogleFonts.nunito(
+        fontSize: 13,
+        fontWeight: FontWeight.w700,
+        color: _textGray,
+      ),
+    );
+  }
+
+  Widget _buildQuestionCard() {
+    final question = _questions[_currentIndex];
+    final questionText = '${question['question_text'] ?? ''}';
+
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final screenHeight = MediaQuery.of(context).size.height;
+        final isCompact = screenHeight < 700 || constraints.maxWidth < 360;
+        final isLongQuestion = questionText.length > 150;
+        final mascotSize = isCompact || isLongQuestion ? 34.0 : 50.0;
+        final cardPadding = isCompact ? 18.0 : 22.0;
+        final questionFontSize = isCompact ? 16.0 : 18.0;
+
+        return ConstrainedBox(
+          constraints: BoxConstraints(
+            minHeight: isCompact ? 150 : 180,
+          ),
+          child: Container(
+            width: double.infinity,
+            padding: EdgeInsets.all(cardPadding),
+            decoration: BoxDecoration(
+              color: _cardBg,
+              borderRadius: const BorderRadius.all(Radius.circular(20)),
+              border: Border.all(color: _neutral),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.04),
+                  blurRadius: 20,
+                  offset: const Offset(0, 10),
+                ),
+              ],
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Expanded(
+                      child: Align(
+                        alignment: Alignment.centerLeft,
+                        child: _buildDifficultyBadge(
+                          question['difficulty'] ?? 1,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    ClipRRect(
+                      borderRadius: BorderRadius.circular(12),
+                      child: Image.asset(
+                        'assets/avecfodn.jpeg',
+                        width: mascotSize,
+                        height: mascotSize,
+                        fit: BoxFit.cover,
+                        errorBuilder: (context, error, stack) {
+                          return Container(
+                            width: mascotSize,
+                            height: mascotSize,
+                            decoration: BoxDecoration(
+                              color: const Color(0xFFFFF3E8),
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            child: Icon(
+                              Icons.pets,
+                              color: _orange,
+                              size: mascotSize * 0.58,
+                            ),
+                          );
+                        },
+                      ),
+                    ),
+                  ],
+                ),
+                SizedBox(height: isCompact ? 14 : 18),
+                Text(
+                  questionText,
+                  softWrap: true,
+                  maxLines: null,
+                  overflow: TextOverflow.visible,
+                  style: GoogleFonts.nunito(
+                    fontSize: questionFontSize,
+                    fontWeight: FontWeight.w700,
+                    color: _textDark,
+                    height: 1.45,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildExplanationCard() {
     final question = _questions[_currentIndex];
     final options = question['options'] as List;
     final correctOption = options.firstWhere(
@@ -461,265 +567,224 @@ class _QuizScreenState extends State<QuizScreen> {
         'option_text': '',
       },
     );
-    final correctText = correctOption['option_text'] ?? '';
-    return SingleChildScrollView(
-      padding: const EdgeInsets.symmetric(
-        horizontal: 20),
+    final correctText = '${correctOption['option_text'] ?? ''}';
+    final explanation = '${question['explanation'] ?? ''}';
+    final statusColor = _isCorrectAnswer ? _correct : _incorrect;
+    final backgroundColor = _isCorrectAnswer
+      ? const Color(0xFFE8F5E9)
+      : const Color(0xFFFFF7ED);
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(18),
+      decoration: BoxDecoration(
+        color: backgroundColor,
+        borderRadius: const BorderRadius.all(Radius.circular(18)),
+        border: Border.all(color: statusColor.withOpacity(0.35)),
+      ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
         children: [
-          const SizedBox(height: 8),
-          Text(
-            'Question ${_currentIndex + 1} '
-            'sur ${_questions.length}',
-            style: GoogleFonts.nunito(
-              fontSize: 13, color: _textGray)),
-          const SizedBox(height: 16),
-          Container(
-            width: double.infinity,
-            padding: const EdgeInsets.all(20),
-            decoration: BoxDecoration(
-              color: _cardBg,
-              borderRadius: const BorderRadius.all(Radius.circular(16)),
-              border: Border.all(color: _neutral),
-            ),
-            child: Column(
-              crossAxisAlignment:
-                CrossAxisAlignment.start,
-              children: [
-                Row(
-                  mainAxisAlignment:
-                    MainAxisAlignment.spaceBetween,
-                  children: [
-                    _buildDifficultyBadge(
-                      question['difficulty'] ?? 1),
-                    Image.asset(
-                      'assets/avecfodn.jpeg',
-                      height: 50,
-                      fit: BoxFit.contain,
-                      errorBuilder: (context, error, stack) {
-                        return Container(
-                          color: const Color(0xFFFFF3E8),
-                          child: const Icon(
-                            Icons.pets,
-                            color: Color(0xFFF77F00),
-                            size: 40,
-                          ),
-                        );
-                      },
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 12),
-                Text(
-                  question['question_text'] ?? '',
-                  style: GoogleFonts.nunito(
-                    fontSize: 18,
-                    fontWeight: FontWeight.w600,
-                    color: _textDark,
-                    height: 1.5,
-                  )),
-              ],
-            ),
-          ),
-          if (_answered) ...[
-            const SizedBox(height: 12),
-            Container(
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: _isCorrectAnswer
-                  ? const Color(0xFFE8F5E9)
-                  : const Color(0xFFFFEBEB),
-                borderRadius: const BorderRadius.all(Radius.circular(12)),
-                border: Border.all(
-                  color: _isCorrectAnswer
-                    ? _correct : _incorrect),
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Icon(
+                _isCorrectAnswer
+                  ? Icons.check_circle_outline
+                  : Icons.cancel_outlined,
+                color: statusColor,
+                size: 20,
               ),
-              child: Row(
-                crossAxisAlignment:
-                  CrossAxisAlignment.start,
-                children: [
-                  Icon(
-                    _isCorrectAnswer
-                      ? Icons.check_circle_outline
-                      : Icons.cancel_outlined,
-                    color: _isCorrectAnswer
-                      ? _correct : _incorrect,
-                    size: 18,
+              const SizedBox(width: 10),
+              Expanded(
+                child: Text(
+                  _isCorrectAnswer
+                    ? 'Bonne réponse ! +points'
+                    : 'Mauvaise réponse',
+                  softWrap: true,
+                  style: GoogleFonts.nunito(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w800,
+                    color: statusColor,
+                    height: 1.35,
                   ),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment:
-                        CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          _isCorrectAnswer
-                            ? 'Bonne réponse ! +points'
-                            : 'Mauvaise réponse',
-                          style: GoogleFonts.nunito(
-                            fontSize: 13,
-                            fontWeight: FontWeight.w700,
-                            color: _isCorrectAnswer
-                              ? _correct : _incorrect,
-                          ),
-                        ),
-                        const SizedBox(height: 4),
-                        if (!_isCorrectAnswer) ...[
-                          RichText(
-                            text: TextSpan(
-                              style: GoogleFonts.nunito(
-                                fontSize: 13,
-                                color: _textDark,
-                              ),
-                              children: [
-                                const TextSpan(
-                                  text: 'Bonne réponse : ',
-                                ),
-                                TextSpan(
-                                  text: '$correctText',
-                                  style:
-                                    GoogleFonts.nunito(
-                                    fontSize: 13,
-                                    fontWeight:
-                                      FontWeight.w600,
-                                    color: _textDark,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                          const SizedBox(height: 4),
-                        ],
-                        Text(
-                          question['explanation'] ?? '',
-                          style: GoogleFonts.nunito(
-                            fontSize: 13,
-                            color: _isCorrectAnswer
-                              ? _textDark : _textGray,
-                            height: 1.5,
-                          ),
-                        ),
-                      ],
+                ),
+              ),
+            ],
+          ),
+          if (!_isCorrectAnswer && correctText.isNotEmpty) ...[
+            const SizedBox(height: 10),
+            RichText(
+              text: TextSpan(
+                style: GoogleFonts.nunito(
+                  fontSize: 14,
+                  color: _textDark,
+                  height: 1.4,
+                ),
+                children: [
+                  const TextSpan(text: 'Bonne réponse : '),
+                  TextSpan(
+                    text: correctText,
+                    style: GoogleFonts.nunito(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w800,
+                      color: _textDark,
+                      height: 1.4,
                     ),
                   ),
                 ],
               ),
-            ).animate()
-             .fadeIn(duration: 300.ms)
-             .slideY(begin: 0.2),
+            ),
           ],
-          const SizedBox(height: 16),
+          if (explanation.isNotEmpty) ...[
+            const SizedBox(height: 14),
+            Text(
+              'Explication',
+              style: GoogleFonts.nunito(
+                fontSize: 14,
+                fontWeight: FontWeight.w900,
+                color: _textDark,
+              ),
+            ),
+            const SizedBox(height: 6),
+            Text(
+              explanation,
+              softWrap: true,
+              maxLines: null,
+              overflow: TextOverflow.visible,
+              style: GoogleFonts.nunito(
+                fontSize: 14,
+                color: _textDark,
+                height: 1.55,
+              ),
+            ),
+          ],
         ],
       ),
-    );
+    ).animate()
+      .fadeIn(duration: 300.ms)
+      .slideY(begin: 0.12);
   }
 
   Widget _buildOptions() {
     final question = _questions[_currentIndex];
     final options = question['options'] as List;
     final letters = ['A', 'B', 'C', 'D'];
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(
-        20, 0, 20, 24),
-      child: Column(
-        children: List.generate(options.length, (i) {
-          final option =
-            Map<String,dynamic>.from(options[i]);
-          final optionId = option['id'] as int;
-          final isSelected =
-            _selectedOptionId == optionId;
-          final isCorrectOption =
-            option['is_correct'] == true;
-          final isWrongSelected =
-            isSelected && !isCorrectOption;
-          final isRightOption =
-            isCorrectOption && _answered;
-          final isNotSelected =
-            _answered && !isSelected &&
-            !isRightOption;
+    return Column(
+      children: List.generate(options.length, (i) {
+        final option =
+          Map<String,dynamic>.from(options[i]);
+        final optionId = option['id'] as int;
+        final isSelected =
+          _selectedOptionId == optionId;
+        final isCorrectOption =
+          option['is_correct'] == true;
+        final isWrongSelected =
+          isSelected && !isCorrectOption;
+        final isRightOption =
+          isCorrectOption && _answered;
+        final isNotSelected =
+          _answered && !isSelected &&
+          !isRightOption;
 
-          Color bgColor;
-          Color borderColor;
-          Color circleColor;
-          Color letterColor;
-          Widget? trailingIcon;
+        Color bgColor;
+        Color borderColor;
+        Color circleColor;
+        Color letterColor;
+        Widget? trailingIcon;
 
-          if (_answered) {
-            if (isRightOption) {
-              bgColor = const Color(0xFFE8F5E9);
-              borderColor = const Color(0xFF22C55E);
-              circleColor = const Color(0xFF22C55E);
-              letterColor = Colors.white;
-              trailingIcon = const Icon(
-                Icons.check_circle_rounded,
-                color: Color(0xFF22C55E),
-                size: 22,
-              );
-            } else if (isWrongSelected) {
-              bgColor = const Color(0xFFFFEBEB);
-              borderColor = const Color(0xFFEF4444);
-              circleColor = const Color(0xFFEF4444);
-              letterColor = Colors.white;
-              trailingIcon = const Icon(
-                Icons.cancel_rounded,
-                color: Color(0xFFEF4444),
-                size: 22,
-              );
-            } else {
-              bgColor = Colors.white;
-              borderColor = _neutral;
-              circleColor = _cardBg;
-              letterColor = _textGray;
-              trailingIcon = null;
-            }
+        if (_answered) {
+          if (isRightOption) {
+            bgColor = const Color(0xFFE8F5E9);
+            borderColor = const Color(0xFF22C55E);
+            circleColor = const Color(0xFF22C55E);
+            letterColor = Colors.white;
+            trailingIcon = const Icon(
+              Icons.check_circle_rounded,
+              color: Color(0xFF22C55E),
+              size: 22,
+            );
+          } else if (isWrongSelected) {
+            bgColor = const Color(0xFFFFEBEB);
+            borderColor = const Color(0xFFEF4444);
+            circleColor = const Color(0xFFEF4444);
+            letterColor = Colors.white;
+            trailingIcon = const Icon(
+              Icons.cancel_rounded,
+              color: Color(0xFFEF4444),
+              size: 22,
+            );
           } else {
-            bgColor = isSelected
-              ? const Color(0xFFFFF3E8)
-              : Colors.white;
-            borderColor = isSelected ? _orange : _neutral;
-            circleColor = isSelected ? _orange : _cardBg;
-            letterColor = isSelected ? Colors.white : _textGray;
-            trailingIcon = isSelected
-              ? const Icon(
-                  Icons.radio_button_checked,
-                  color: _orange,
-                  size: 20,
-                )
-              : null;
+            bgColor = Colors.white;
+            borderColor = _neutral;
+            circleColor = _cardBg;
+            letterColor = _textGray;
+            trailingIcon = null;
           }
+        } else {
+          bgColor = isSelected
+            ? const Color(0xFFFFF3E8)
+            : Colors.white;
+          borderColor = isSelected ? _orange : _neutral;
+          circleColor = isSelected ? _orange : _cardBg;
+          letterColor = isSelected ? Colors.white : _textGray;
+          trailingIcon = isSelected
+            ? const Icon(
+                Icons.radio_button_checked,
+                color: _orange,
+                size: 20,
+              )
+            : null;
+        }
 
-          return Padding(
-            padding: const EdgeInsets.only(bottom: 10),
-            child: GestureDetector(
-              onTap: _answered
-                ? null
-                : () => _onOptionSelected(optionId),
-              child: AnimatedOpacity(
+        return Padding(
+          padding: EdgeInsets.only(
+            bottom: i == options.length - 1 ? 0 : 12,
+          ),
+          child: GestureDetector(
+            onTap: _answered
+              ? null
+              : () => _onOptionSelected(optionId),
+            child: AnimatedOpacity(
+              duration:
+                const Duration(milliseconds: 300),
+              opacity: isNotSelected ? 0.4 : 1.0,
+              child: AnimatedContainer(
                 duration:
                   const Duration(milliseconds: 300),
-                opacity: isNotSelected ? 0.4 : 1.0,
-                child: AnimatedContainer(
-                  duration:
-                    const Duration(milliseconds: 300),
-                  width: double.infinity,
-                  padding: const EdgeInsets.all(16),
-                  decoration: BoxDecoration(
-                    color: bgColor,
-                    borderRadius:
-                      BorderRadius.circular(14),
-                    border: Border.all(
-                      color: borderColor,
-                      width: (_answered && isRightOption) ||
-                          (_answered && isWrongSelected) ||
-                          (!_answered && isSelected)
-                        ? 2
-                        : 1,
-                    ),
+                width: double.infinity,
+                constraints: const BoxConstraints(minHeight: 64),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 18,
+                  vertical: 16,
+                ),
+                decoration: BoxDecoration(
+                  color: bgColor,
+                  borderRadius:
+                    BorderRadius.circular(16),
+                  border: Border.all(
+                    color: borderColor,
+                    width: (_answered && isRightOption) ||
+                        (_answered && isWrongSelected) ||
+                        (!_answered && isSelected)
+                      ? 2
+                      : 1,
                   ),
-                  child: Row(children: [
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withOpacity(0.03),
+                      blurRadius: 12,
+                      offset: const Offset(0, 6),
+                    ),
+                  ],
+                ),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.center,
+                  children: [
                     Container(
-                      width: 28, height: 28,
+                      width: 30,
+                      height: 30,
                       decoration: BoxDecoration(
                         shape: BoxShape.circle,
                         color: circleColor,
@@ -732,27 +797,77 @@ class _QuizScreenState extends State<QuizScreen> {
                             ? letters[i] : '?',
                           style: GoogleFonts.nunito(
                             fontSize: 13,
-                            fontWeight: FontWeight.w700,
+                            fontWeight: FontWeight.w800,
                             color: letterColor,
-                          ))),
+                          ),
+                        ),
+                      ),
                     ),
-                    const SizedBox(width: 12),
+                    const SizedBox(width: 14),
                     Expanded(
                       child: Text(
                         option['option_text'] ?? '',
+                        softWrap: true,
+                        maxLines: null,
+                        overflow: TextOverflow.visible,
                         style: GoogleFonts.nunito(
                           fontSize: 15,
-                          fontWeight: FontWeight.w600,
+                          fontWeight: FontWeight.w700,
                           color: _textDark,
-                        ))),
-                    if (trailingIcon != null) trailingIcon,
-                  ]),
+                          height: 1.35,
+                        ),
+                      ),
+                    ),
+                    if (trailingIcon != null) ...[
+                      const SizedBox(width: 10),
+                      trailingIcon,
+                    ],
+                  ],
                 ),
               ),
             ),
-          );
-        }),
-      ),
+          ),
+        );
+      }),
+    );
+  }
+
+  Widget _buildQuizBody() {
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final isWide = constraints.maxWidth > 560;
+        final horizontalPadding = isWide ? 32.0 : 20.0;
+        final maxContentWidth = isWide ? 560.0 : double.infinity;
+
+        return SingleChildScrollView(
+          padding: EdgeInsets.fromLTRB(
+            horizontalPadding,
+            16,
+            horizontalPadding,
+            24,
+          ),
+          child: Center(
+            child: ConstrainedBox(
+              constraints: BoxConstraints(maxWidth: maxContentWidth),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  _buildQuestionCounter(),
+                  const SizedBox(height: 18),
+                  _buildQuestionCard(),
+                  const SizedBox(height: 24),
+                  _buildOptions(),
+                  if (_answered) ...[
+                    const SizedBox(height: 20),
+                    _buildExplanationCard(),
+                  ],
+                  const SizedBox(height: 24),
+                ],
+              ),
+            ),
+          ),
+        );
+      },
     );
   }
 
@@ -817,8 +932,7 @@ class _QuizScreenState extends State<QuizScreen> {
       body: SafeArea(
         child: Column(children: [
           _buildTopBar(),
-          Expanded(child: _buildQuestion()),
-          _buildOptions(),
+          Expanded(child: _buildQuizBody()),
         ]),
       ),
     );
