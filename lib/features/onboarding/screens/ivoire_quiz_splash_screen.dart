@@ -1,8 +1,34 @@
+// ignore_for_file: use_colored_box
+
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
+// ─────────────────────────────────────────────────────────────────────────────
+//  PALETTE CENTRALISÉE
+// ─────────────────────────────────────────────────────────────────────────────
+abstract final class _C {
+  /// Fond principal : blanc ivoire très doux — homogène avec le reste de l'app.
+  static const Color bg           = Color(0xFFFFFCF4);
+
+  // Marque
+  static const Color orange       = Color(0xFFF58220);
+  static const Color orangeLight  = Color(0xFFFFA94D);
+  static const Color green        = Color(0xFF168A49);
+
+  // Typographie
+  static const Color textDark     = Color(0xFF2B1A12);
+  static const Color textSoft     = Color(0xFF5F5148);
+
+  // UI discrète
+  static const Color progressTrack = Color(0xFFEDE5D8);
+  static const Color dotBorder     = Color(0xFFD9CEBA);
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+//  SPLASH SCREEN
+// ─────────────────────────────────────────────────────────────────────────────
 class IvoireQuizSplashScreen extends StatefulWidget {
   const IvoireQuizSplashScreen({
     this.autoNavigate = false,
@@ -10,8 +36,8 @@ class IvoireQuizSplashScreen extends StatefulWidget {
     super.key,
   });
 
-  /// Active cette option pour déclencher [onAnimationComplete] à la fin de
-  /// l'animation principale, par exemple pour naviguer vers l'écran suivant.
+  /// Mettre à `true` pour que le widget appelle [onAnimationComplete]
+  /// à la fin de l'animation et navigate vers l'écran suivant.
   final bool autoNavigate;
   final VoidCallback? onAnimationComplete;
 
@@ -21,13 +47,16 @@ class IvoireQuizSplashScreen extends StatefulWidget {
 
 class _IvoireQuizSplashScreenState extends State<IvoireQuizSplashScreen>
     with TickerProviderStateMixin {
-  static const Duration _entryDuration = Duration(milliseconds: 2850);
-  static const Duration _ambientDuration = Duration(milliseconds: 4200);
+  // ── Durées ─────────────────────────────────────────────────────────────────
+  static const Duration _entryDur   = Duration(milliseconds: 2850);
+  static const Duration _ambientDur = Duration(milliseconds: 4400);
 
-  late final AnimationController _entryController;
-  late final AnimationController _ambientController;
+  // ── Controllers ────────────────────────────────────────────────────────────
+  late final AnimationController _entry;
+  late final AnimationController _ambient; // boucle infinie (effets vivants)
 
-  late final Animation<double> _backgroundOpacity;
+  // ── Animations d'entrée ────────────────────────────────────────────────────
+  late final Animation<double> _bgOpacity;
   late final Animation<double> _mascotOpacity;
   late final Animation<double> _mascotScale;
   late final Animation<Offset> _mascotSlide;
@@ -39,110 +68,109 @@ class _IvoireQuizSplashScreenState extends State<IvoireQuizSplashScreen>
   late final Animation<double> _progress;
   late final Animation<double> _dotsOpacity;
 
+  // ── init ───────────────────────────────────────────────────────────────────
   @override
   void initState() {
     super.initState();
 
-    _entryController = AnimationController(
-      vsync: this,
-      duration: _entryDuration,
-    );
-    _ambientController = AnimationController(
-      vsync: this,
-      duration: _ambientDuration,
-    )..repeat(reverse: true);
+    _entry   = AnimationController(vsync: this, duration: _entryDur);
+    _ambient = AnimationController(vsync: this, duration: _ambientDur)
+      ..repeat(reverse: true);
 
-    _backgroundOpacity = _curved(0.00, 0.18, Curves.easeOutCubic);
-    _mascotOpacity = _curved(0.10, 0.36, Curves.easeOut);
-    _mascotScale = _curved(0.10, 0.42, Curves.easeOutBack)
-        .drive(Tween<double>(begin: 0.92, end: 1));
-    _mascotSlide = _curved(0.10, 0.42, Curves.easeOutCubic).drive(
-      Tween<Offset>(begin: const Offset(0, 0.14), end: Offset.zero),
-    );
-    _titleOpacity = _curved(0.34, 0.54, Curves.easeOut);
-    _titleSlide = _curved(0.34, 0.58, Curves.easeOutCubic).drive(
-      Tween<Offset>(begin: const Offset(0, 0.18), end: Offset.zero),
-    );
-    _sloganOpacity = _curved(0.50, 0.70, Curves.easeOut);
-    _sloganSlide = _curved(0.50, 0.74, Curves.easeOutCubic).drive(
-      Tween<Offset>(begin: const Offset(0, 0.12), end: Offset.zero),
-    );
-    _loaderOpacity = _curved(0.66, 0.80, Curves.easeOut);
-    _progress = _curved(0.68, 0.98, Curves.easeInOutCubic);
-    _dotsOpacity = _curved(0.78, 1.00, Curves.easeOut);
+    // Helper local
+    Animation<double> c(double t0, double t1, Curve curve) => CurvedAnimation(
+          parent: _entry,
+          curve: Interval(t0, t1, curve: curve),
+        );
 
-    _entryController.forward().whenComplete(() {
+    _bgOpacity     = c(0.00, 0.22, Curves.easeOutCubic);
+    _mascotOpacity = c(0.08, 0.38, Curves.easeOut);
+    _mascotScale   = c(0.08, 0.44, Curves.easeOutBack)
+        .drive(Tween(begin: 0.90, end: 1.0));
+    _mascotSlide   = c(0.08, 0.44, Curves.easeOutCubic)
+        .drive(Tween(begin: const Offset(0, 0.12), end: Offset.zero));
+    _titleOpacity  = c(0.32, 0.54, Curves.easeOut);
+    _titleSlide    = c(0.32, 0.58, Curves.easeOutCubic)
+        .drive(Tween(begin: const Offset(0, 0.18), end: Offset.zero));
+    _sloganOpacity = c(0.48, 0.70, Curves.easeOut);
+    _sloganSlide   = c(0.48, 0.74, Curves.easeOutCubic)
+        .drive(Tween(begin: const Offset(0, 0.12), end: Offset.zero));
+    _loaderOpacity = c(0.64, 0.80, Curves.easeOut);
+    _progress      = c(0.66, 0.98, Curves.easeInOutCubic);
+    _dotsOpacity   = c(0.78, 1.00, Curves.easeOut);
+
+    _entry.forward().whenComplete(() {
       if (!mounted || !widget.autoNavigate) return;
       widget.onAnimationComplete?.call();
     });
   }
 
-  Animation<double> _curved(double begin, double end, Curve curve) {
-    return CurvedAnimation(
-      parent: _entryController,
-      curve: Interval(begin, end, curve: curve),
-    );
-  }
-
   @override
   void dispose() {
-    _entryController.dispose();
-    _ambientController.dispose();
+    _entry.dispose();
+    _ambient.dispose();
     super.dispose();
   }
 
+  // ── Build ──────────────────────────────────────────────────────────────────
   @override
   Widget build(BuildContext context) {
-    final Size screen = MediaQuery.sizeOf(context);
-    final bool compactHeight = screen.height < 720;
+    final size    = MediaQuery.sizeOf(context);
+    final compact = size.height < 720;
+    final hPad    = size.width < 360 ? 20.0 : 28.0;
 
     return Scaffold(
-      backgroundColor: _SplashColors.ivory,
+      backgroundColor: _C.bg,
       body: SafeArea(
         child: AnimatedBuilder(
-          animation: Listenable.merge([_entryController, _ambientController]),
-          builder: (BuildContext context, Widget? child) {
+          animation: Listenable.merge([_entry, _ambient]),
+          builder: (context, _) {
             return Stack(
-              children: <Widget>[
+              children: [
+                // Fond décoratif (motifs, silhouettes)
                 Opacity(
-                  opacity: _backgroundOpacity.value,
-                  child: const _DecorativeBackground(),
+                  opacity: _bgOpacity.value,
+                  child: const _DecorBackground(),
                 ),
-                _BottomWaves(ambientValue: _ambientController.value),
+
+                // Vagues du bas inspirées du drapeau ivoirien
+                _BottomWaves(ambient: _ambient.value),
+
+                // Contenu principal
                 Padding(
-                  padding: EdgeInsets.symmetric(
-                    horizontal: _SplashSpacing.horizontal(screen.width),
-                  ),
+                  padding: EdgeInsets.symmetric(horizontal: hPad),
                   child: Column(
-                    children: <Widget>[
-                      SizedBox(height: compactHeight ? 20 : 36),
+                    children: [
+                      SizedBox(height: compact ? 20 : 36),
                       Expanded(
                         child: Center(
                           child: ConstrainedBox(
                             constraints: const BoxConstraints(maxWidth: 420),
                             child: _MainContent(
-                              compactHeight: compactHeight,
-                              mascotOpacity: _mascotOpacity.value,
-                              mascotScale: _mascotScale.value,
-                              mascotSlide: _mascotSlide.value,
-                              titleOpacity: _titleOpacity.value,
-                              titleSlide: _titleSlide.value,
-                              sloganOpacity: _sloganOpacity.value,
-                              sloganSlide: _sloganSlide.value,
-                              ambientValue: _ambientController.value,
+                              compact:        compact,
+                              mascotOpacity:  _mascotOpacity.value,
+                              mascotScale:    _mascotScale.value,
+                              mascotSlide:    _mascotSlide.value,
+                              titleOpacity:   _titleOpacity.value,
+                              titleSlide:     _titleSlide.value,
+                              sloganOpacity:  _sloganOpacity.value,
+                              sloganSlide:    _sloganSlide.value,
+                              ambient:        _ambient.value,
                             ),
                           ),
                         ),
                       ),
+
+                      // Barre de chargement + points
                       Opacity(
                         opacity: _loaderOpacity.value,
-                        child: _SplashProgress(
-                          progress: _progress.value,
+                        child: _ProgressSection(
+                          progress:    _progress.value,
                           dotsOpacity: _dotsOpacity.value,
-                          ambientValue: _ambientController.value,
+                          ambient:     _ambient.value,
                         ),
                       ),
-                      SizedBox(height: compactHeight ? 92 : 116),
+                      SizedBox(height: compact ? 90 : 114),
                     ],
                   ),
                 ),
@@ -155,9 +183,12 @@ class _IvoireQuizSplashScreenState extends State<IvoireQuizSplashScreen>
   }
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
+//  CONTENU CENTRAL
+// ─────────────────────────────────────────────────────────────────────────────
 class _MainContent extends StatelessWidget {
   const _MainContent({
-    required this.compactHeight,
+    required this.compact,
     required this.mascotOpacity,
     required this.mascotScale,
     required this.mascotSlide,
@@ -165,86 +196,79 @@ class _MainContent extends StatelessWidget {
     required this.titleSlide,
     required this.sloganOpacity,
     required this.sloganSlide,
-    required this.ambientValue,
+    required this.ambient,
   });
 
-  final bool compactHeight;
-  final double mascotOpacity;
-  final double mascotScale;
-  final Offset mascotSlide;
-  final double titleOpacity;
-  final Offset titleSlide;
-  final double sloganOpacity;
-  final Offset sloganSlide;
-  final double ambientValue;
+  final bool    compact;
+  final double  mascotOpacity;
+  final double  mascotScale;
+  final Offset  mascotSlide;
+  final double  titleOpacity;
+  final Offset  titleSlide;
+  final double  sloganOpacity;
+  final Offset  sloganSlide;
+  final double  ambient;
 
   @override
   Widget build(BuildContext context) {
-    final double mascotSize = compactHeight ? 178 : 214;
+    final mascotSz = compact ? 180.0 : 218.0;
 
     return Column(
       mainAxisSize: MainAxisSize.min,
-      children: <Widget>[
+      children: [
+        // ── Zone mascotte avec micro ornements ─────────────────────────────
         Stack(
           clipBehavior: Clip.none,
           alignment: Alignment.center,
-          children: <Widget>[
-            const Positioned(
-              left: 34,
-              top: 24,
-              child: _MicroOrnament(color: _SplashColors.orange, size: 7),
-            ),
-            const Positioned(
-              right: 24,
-              top: 44,
-              child: _MicroOrnament.star(color: _SplashColors.green),
-            ),
-            const Positioned(
-              left: 18,
-              bottom: 48,
-              child: _MicroOrnament.star(color: _SplashColors.green, size: 13),
-            ),
-            const Positioned(
-              right: 44,
-              bottom: 24,
-              child: _MicroOrnament(color: _SplashColors.orange, size: 9),
-            ),
+          children: [
+            Positioned(left:  28, top:    18, child: _Ornament.dot(color: _C.orange, size: 7)),
+            Positioned(right: 18, top:    36, child: _Ornament.star(color: _C.green)),
+            Positioned(left:  14, bottom: 44, child: _Ornament.star(color: _C.green, size: 13)),
+            Positioned(right: 38, bottom: 18, child: _Ornament.dot(color: _C.orange, size: 9)),
+
             SlideTransition(
-              position: AlwaysStoppedAnimation<Offset>(mascotSlide),
+              position: AlwaysStoppedAnimation(mascotSlide),
               child: Opacity(
                 opacity: mascotOpacity,
                 child: Transform.translate(
-                  offset: Offset(0, -5 * math.sin(ambientValue * math.pi)),
+                  // Légère lévitation sinusoïdale calée sur le cycle ambiant
+                  offset: Offset(0, -5 * math.sin(ambient * math.pi)),
                   child: Transform.scale(
                     scale: mascotScale,
-                    child: _Mascot(size: mascotSize),
+                    child: _Mascot(size: mascotSz),
                   ),
                 ),
               ),
             ),
           ],
         ),
-        SizedBox(height: compactHeight ? 20 : 28),
+
+        SizedBox(height: compact ? 20 : 30),
+
+        // ── Titre ──────────────────────────────────────────────────────────
         SlideTransition(
-          position: AlwaysStoppedAnimation<Offset>(titleSlide),
-          child: Opacity(
-            opacity: titleOpacity,
-            child: const _BrandTitle(),
-          ),
+          position: AlwaysStoppedAnimation(titleSlide),
+          child: Opacity(opacity: titleOpacity, child: const _BrandTitle()),
         ),
-        SizedBox(height: compactHeight ? 12 : 16),
+
+        SizedBox(height: compact ? 12 : 16),
+
+        // ── Slogan ─────────────────────────────────────────────────────────
         SlideTransition(
-          position: AlwaysStoppedAnimation<Offset>(sloganSlide),
-          child: Opacity(
-            opacity: sloganOpacity,
-            child: const _Slogan(),
-          ),
+          position: AlwaysStoppedAnimation(sloganSlide),
+          child: Opacity(opacity: sloganOpacity, child: const _Slogan()),
         ),
       ],
     );
   }
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
+//  MASCOTTE
+//  ─ Le ColoredBox parent a EXACTEMENT la même couleur que le Scaffold
+//    → l'image (fond blanc intégré) se fond naturellement dans la page.
+//  ─ Aucune carte, aucune ombre forte, aucun cadre visible.
+// ─────────────────────────────────────────────────────────────────────────────
 class _Mascot extends StatelessWidget {
   const _Mascot({required this.size});
 
@@ -252,116 +276,79 @@ class _Mascot extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return SizedBox(
-      width: size,
-      height: size,
-      child: Stack(
-        alignment: Alignment.center,
-        children: <Widget>[
-          Positioned(
-            bottom: 10,
-            child: Container(
-              width: size * 0.58,
-              height: size * 0.10,
-              decoration: BoxDecoration(
-                color: _SplashColors.shadow.withOpacity(0.12),
-                borderRadius: BorderRadius.circular(999),
-                boxShadow: <BoxShadow>[
-                  BoxShadow(
-                    color: _SplashColors.shadow.withOpacity(0.10),
-                    blurRadius: 22,
-                    spreadRadius: 2,
-                  ),
-                ],
-              ),
-            ),
-          ),
-          Image.asset(
-            'assets/avecfodn.jpeg',
-            width: size,
-            height: size,
-            fit: BoxFit.contain,
-            errorBuilder: (BuildContext context, Object error, StackTrace? stack) {
-              // Remplacer par assets/images/ivoire_quiz_elephant.png si la mascotte finale est ajoutée plus tard.
-              return _MascotPlaceholder(size: size);
-            },
-          ),
-        ],
+    return ColoredBox(
+      color: _C.bg, // identique au fond du Scaffold → fondu parfait
+      child: SizedBox(
+        width:  size,
+        height: size,
+        child: Image.asset(
+          'assets/avecfodn.jpeg',  // ← asset existant dans le projet
+          width:  size,
+          height: size,
+          fit: BoxFit.contain,
+          errorBuilder: (context, _, __) => _MascotFallback(size: size),
+        ),
       ),
     );
   }
 }
 
-class _MascotPlaceholder extends StatelessWidget {
-  const _MascotPlaceholder({required this.size});
+/// Placeholder affiché si l'asset est manquant (ex : tests unitaires).
+class _MascotFallback extends StatelessWidget {
+  const _MascotFallback({required this.size});
 
   final double size;
 
   @override
   Widget build(BuildContext context) {
     return Container(
-      width: size * 0.86,
-      height: size * 0.86,
+      width:  size * 0.88,
+      height: size * 0.88,
       decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.92),
-        shape: BoxShape.circle,
-        border: Border.all(color: _SplashColors.orange.withOpacity(0.16)),
-        boxShadow: <BoxShadow>[
-          BoxShadow(
-            color: _SplashColors.orange.withOpacity(0.10),
-            blurRadius: 28,
-            offset: const Offset(0, 16),
-          ),
-        ],
+        color:  _C.bg,
+        shape:  BoxShape.circle,
+        border: Border.all(color: _C.orange.withOpacity(0.18)),
       ),
-      child: Icon(
-        Icons.cruelty_free_rounded,
-        color: _SplashColors.orange,
-        size: size * 0.42,
-      ),
+      child: Icon(Icons.cruelty_free_rounded, color: _C.orange, size: size * 0.44),
     );
   }
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
+//  TITRE  "IvoireQuiz"
+// ─────────────────────────────────────────────────────────────────────────────
 class _BrandTitle extends StatelessWidget {
   const _BrandTitle();
 
   @override
   Widget build(BuildContext context) {
-    final TextStyle baseStyle = GoogleFonts.nunito(
-      fontSize: 42,
-      height: 1,
-      fontWeight: FontWeight.w900,
-      letterSpacing: -1.4,
+    final base = GoogleFonts.nunito(
+      fontSize:      44,
+      height:        1,
+      fontWeight:    FontWeight.w900,
+      letterSpacing: -1.6,
     );
 
     return Stack(
       clipBehavior: Clip.none,
-      alignment: Alignment.bottomRight,
-      children: <Widget>[
+      alignment:    Alignment.bottomRight,
+      children: [
         RichText(
           textAlign: TextAlign.center,
-          text: TextSpan(
-            children: <TextSpan>[
-              TextSpan(
-                text: 'Ivoire',
-                style: baseStyle.copyWith(color: _SplashColors.orange),
-              ),
-              TextSpan(
-                text: 'Quiz',
-                style: baseStyle.copyWith(color: _SplashColors.green),
-              ),
-            ],
-          ),
+          text: TextSpan(children: [
+            TextSpan(text: 'Ivoire', style: base.copyWith(color: _C.orange)),
+            TextSpan(text: 'Quiz',   style: base.copyWith(color: _C.green)),
+          ]),
         ),
+        // Petit trait soulignement sous "Quiz" — discret et élégant
         Positioned(
-          right: 1,
-          bottom: -9,
+          right:  2,
+          bottom: -8,
           child: Container(
-            width: 52,
-            height: 5,
+            width:  50,
+            height: 4,
             decoration: BoxDecoration(
-              color: _SplashColors.orange.withOpacity(0.28),
+              color:        _C.orange.withOpacity(0.28),
               borderRadius: BorderRadius.circular(999),
             ),
           ),
@@ -371,63 +358,68 @@ class _BrandTitle extends StatelessWidget {
   }
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
+//  SLOGAN
+// ─────────────────────────────────────────────────────────────────────────────
 class _Slogan extends StatelessWidget {
   const _Slogan();
 
   @override
   Widget build(BuildContext context) {
-    final TextStyle baseStyle = GoogleFonts.nunito(
-      color: _SplashColors.textSoft,
-      fontSize: 20,
-      height: 1.34,
-      fontWeight: FontWeight.w700,
+    final base = GoogleFonts.nunito(
+      color:         _C.textSoft,
+      fontSize:      19,
+      height:        1.38,
+      fontWeight:    FontWeight.w600,
       letterSpacing: -0.1,
     );
 
     return RichText(
       textAlign: TextAlign.center,
-      text: TextSpan(
-        children: <InlineSpan>[
-          TextSpan(text: 'Connais-tu vraiment\n', style: baseStyle),
-          TextSpan(text: 'la ', style: baseStyle),
-          TextSpan(
-            text: 'Côte d’Ivoire',
-            style: baseStyle.copyWith(
-              color: _SplashColors.orange,
-              fontWeight: FontWeight.w900,
-            ),
+      text: TextSpan(children: [
+        TextSpan(text: 'Connais-tu vraiment\n', style: base),
+        TextSpan(text: 'la ',                   style: base),
+        TextSpan(
+          text:  'Côte\u202fd\u2019Ivoire',     // espace fine + apostrophe typographique
+          style: base.copyWith(
+            color:      _C.orange,
+            fontWeight: FontWeight.w900,
           ),
-          TextSpan(text: ' ?', style: baseStyle),
-        ],
-      ),
+        ),
+        TextSpan(text: '\u202f?', style: base), // espace fine avant ?
+      ]),
     );
   }
 }
 
-class _SplashProgress extends StatelessWidget {
-  const _SplashProgress({
+// ─────────────────────────────────────────────────────────────────────────────
+//  SECTION CHARGEMENT  (barre arrondie + 3 points)
+// ─────────────────────────────────────────────────────────────────────────────
+class _ProgressSection extends StatelessWidget {
+  const _ProgressSection({
     required this.progress,
     required this.dotsOpacity,
-    required this.ambientValue,
+    required this.ambient,
   });
 
   final double progress;
   final double dotsOpacity;
-  final double ambientValue;
+  final double ambient;
 
   @override
   Widget build(BuildContext context) {
     return Column(
       mainAxisSize: MainAxisSize.min,
-      children: <Widget>[
+      children: [
+        // Barre
         Container(
-          width: 168,
-          height: 8,
+          width:   164,
+          height:  8,
           padding: const EdgeInsets.all(1.5),
           decoration: BoxDecoration(
-            color: _SplashColors.progressTrack,
+            color:        _C.progressTrack,
             borderRadius: BorderRadius.circular(999),
-            border: Border.all(color: Colors.white.withOpacity(0.68)),
+            border:       Border.all(color: Colors.white.withOpacity(0.70)),
           ),
           child: Align(
             alignment: Alignment.centerLeft,
@@ -436,37 +428,40 @@ class _SplashProgress extends StatelessWidget {
               child: Container(
                 decoration: BoxDecoration(
                   gradient: const LinearGradient(
-                    colors: <Color>[
-                      _SplashColors.orangeLight,
-                      _SplashColors.orange,
-                    ],
+                    colors: [_C.orangeLight, _C.orange],
                   ),
                   borderRadius: BorderRadius.circular(999),
+                  boxShadow: [
+                    BoxShadow(
+                      color:      _C.orange.withOpacity(0.28),
+                      blurRadius: 6,
+                      offset:     const Offset(0, 2),
+                    ),
+                  ],
                 ),
               ),
             ),
           ),
         ),
+
         const SizedBox(height: 18),
+
+        // 3 points paginés avec pulsation douce
         Opacity(
           opacity: dotsOpacity,
           child: Row(
             mainAxisSize: MainAxisSize.min,
-            children: <Widget>[
-              _PageDot(
-                color: _SplashColors.orange,
-                scale: 1 + (0.08 * math.sin(ambientValue * math.pi)),
+            children: [
+              _Dot(
+                color: _C.orange,
+                scale: 1 + 0.08 * math.sin(ambient * math.pi),
               ),
               const SizedBox(width: 9),
-              const _PageDot(
-                color: Colors.white,
-                borderColor: _SplashColors.dotBorder,
-                scale: 1,
-              ),
+              const _Dot(color: Colors.white, borderColor: _C.dotBorder, scale: 1.0),
               const SizedBox(width: 9),
-              _PageDot(
-                color: _SplashColors.green,
-                scale: 1 + (0.06 * math.cos(ambientValue * math.pi)),
+              _Dot(
+                color: _C.green,
+                scale: 1 + 0.08 * math.cos(ambient * math.pi),
               ),
             ],
           ),
@@ -476,14 +471,10 @@ class _SplashProgress extends StatelessWidget {
   }
 }
 
-class _PageDot extends StatelessWidget {
-  const _PageDot({
-    required this.color,
-    required this.scale,
-    this.borderColor,
-  });
+class _Dot extends StatelessWidget {
+  const _Dot({required this.color, required this.scale, this.borderColor});
 
-  final Color color;
+  final Color  color;
   final Color? borderColor;
   final double scale;
 
@@ -492,17 +483,17 @@ class _PageDot extends StatelessWidget {
     return Transform.scale(
       scale: scale,
       child: Container(
-        width: 9,
+        width:  9,
         height: 9,
         decoration: BoxDecoration(
-          color: color,
-          shape: BoxShape.circle,
-          border: borderColor == null ? null : Border.all(color: borderColor!),
-          boxShadow: <BoxShadow>[
+          color:  color,
+          shape:  BoxShape.circle,
+          border: borderColor != null ? Border.all(color: borderColor!) : null,
+          boxShadow: [
             BoxShadow(
-              color: color.withOpacity(color == Colors.white ? 0.10 : 0.18),
+              color:      color.withOpacity(color == Colors.white ? 0.08 : 0.22),
               blurRadius: 10,
-              offset: const Offset(0, 4),
+              offset:     const Offset(0, 4),
             ),
           ],
         ),
@@ -511,74 +502,50 @@ class _PageDot extends StatelessWidget {
   }
 }
 
-class _DecorativeBackground extends StatelessWidget {
-  const _DecorativeBackground();
+// ─────────────────────────────────────────────────────────────────────────────
+//  FOND DÉCORATIF  (motifs géométriques + silhouettes icônes, très atténués)
+// ─────────────────────────────────────────────────────────────────────────────
+class _DecorBackground extends StatelessWidget {
+  const _DecorBackground();
 
   @override
   Widget build(BuildContext context) {
     return Stack(
-      children: <Widget>[
+      children: [
         Positioned(
-          top: -28,
-          right: -26,
-          child: Opacity(
-            opacity: 0.12,
-            child: Image.asset(
-              'assets/images/pattern_top_right.png',
-              width: 150,
-              fit: BoxFit.contain,
-              errorBuilder: (_, __, ___) => const _CornerPattern(
-                color: _SplashColors.green,
-                rotate: -0.15,
-              ),
-            ),
-          ),
+          top: -28, right: -26,
+          child: Opacity(opacity: 0.11,
+            child: _CornerPattern(color: _C.green,  rotate: -0.15)),
         ),
         Positioned(
-          left: -38,
-          bottom: 114,
-          child: Opacity(
-            opacity: 0.12,
-            child: Image.asset(
-              'assets/images/pattern_bottom_left.png',
-              width: 150,
-              fit: BoxFit.contain,
-              errorBuilder: (_, __, ___) => const _CornerPattern(
-                color: _SplashColors.orange,
-                rotate: 0.22,
-              ),
-            ),
-          ),
+          left: -38, bottom: 110,
+          child: Opacity(opacity: 0.10,
+            child: _CornerPattern(color: _C.orange, rotate:  0.22)),
         ),
-        const Positioned(
-          top: 84,
-          left: 30,
-          child: _IvorySilhouette(icon: Icons.terrain_rounded, size: 64),
-        ),
-        const Positioned(
-          top: 138,
-          right: 24,
-          child: _IvorySilhouette(icon: Icons.park_rounded, size: 58),
-        ),
-        const Positioned(
-          left: 36,
-          bottom: 252,
-          child: _IvorySilhouette(icon: Icons.water_rounded, size: 72),
-        ),
-        const Positioned(
-          right: 34,
-          bottom: 224,
-          child: _IvorySilhouette(icon: Icons.location_on_rounded, size: 60),
-        ),
+        const Positioned(top:  80, left:  28, child: _Ghost(icon: Icons.terrain_rounded,     size: 62)),
+        const Positioned(top: 136, right: 22, child: _Ghost(icon: Icons.park_rounded,         size: 56)),
+        const Positioned(left: 32, bottom: 250, child: _Ghost(icon: Icons.water_rounded,       size: 70)),
+        const Positioned(right: 30, bottom: 220, child: _Ghost(icon: Icons.location_on_rounded, size: 58)),
       ],
     );
   }
 }
 
+class _Ghost extends StatelessWidget {
+  const _Ghost({required this.icon, required this.size});
+
+  final IconData icon;
+  final double   size;
+
+  @override
+  Widget build(BuildContext context) =>
+      Icon(icon, size: size, color: _C.textDark.withOpacity(0.028));
+}
+
 class _CornerPattern extends StatelessWidget {
   const _CornerPattern({required this.color, required this.rotate});
 
-  final Color color;
+  final Color  color;
   final double rotate;
 
   @override
@@ -587,31 +554,31 @@ class _CornerPattern extends StatelessWidget {
       angle: rotate,
       child: CustomPaint(
         size: const Size(150, 150),
-        painter: _CornerPatternPainter(color: color),
+        painter: _CornerPainter(color: color),
       ),
     );
   }
 }
 
-class _CornerPatternPainter extends CustomPainter {
-  const _CornerPatternPainter({required this.color});
+class _CornerPainter extends CustomPainter {
+  const _CornerPainter({required this.color});
 
   final Color color;
 
   @override
   void paint(Canvas canvas, Size size) {
-    final Paint paint = Paint()
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 1.2
-      ..strokeCap = StrokeCap.round
-      ..color = color.withOpacity(0.30);
+    final paint = Paint()
+      ..style       = PaintingStyle.stroke
+      ..strokeWidth = 1.0
+      ..strokeCap   = StrokeCap.round
+      ..color       = color.withOpacity(0.26);
 
-    for (int i = 0; i < 6; i++) {
-      final double inset = 14.0 + (i * 18);
+    for (var i = 0; i < 6; i++) {
+      final inset = 12.0 + i * 17;
       canvas.drawRRect(
         RRect.fromRectAndRadius(
           Rect.fromLTWH(inset, inset, size.width - inset, size.height - inset),
-          const Radius.circular(28),
+          const Radius.circular(26),
         ),
         paint,
       );
@@ -619,148 +586,106 @@ class _CornerPatternPainter extends CustomPainter {
   }
 
   @override
-  bool shouldRepaint(covariant _CornerPatternPainter oldDelegate) => false;
+  bool shouldRepaint(covariant _CornerPainter old) => false;
 }
 
-class _IvorySilhouette extends StatelessWidget {
-  const _IvorySilhouette({required this.icon, required this.size});
-
-  final IconData icon;
-  final double size;
-
-  @override
-  Widget build(BuildContext context) {
-    return Icon(
-      icon,
-      size: size,
-      color: _SplashColors.textDark.withOpacity(0.035),
-    );
-  }
-}
-
-class _MicroOrnament extends StatelessWidget {
-  const _MicroOrnament({
-    required this.color,
-    required this.size,
-  }) : isStar = false;
-
-  const _MicroOrnament.star({
-    required this.color,
-    this.size = 15,
-  }) : isStar = true;
-
-  final Color color;
-  final double size;
-  final bool isStar;
-
-  @override
-  Widget build(BuildContext context) {
-    if (isStar) {
-      return Icon(
-        Icons.auto_awesome_rounded,
-        color: color.withOpacity(0.72),
-        size: size,
-      );
-    }
-
-    return Container(
-      width: size,
-      height: size,
-      decoration: BoxDecoration(
-        color: color.withOpacity(0.72),
-        shape: BoxShape.circle,
-      ),
-    );
-  }
-}
-
+// ─────────────────────────────────────────────────────────────────────────────
+//  VAGUES DU BAS  (orange gauche / vert droite, animées)
+// ─────────────────────────────────────────────────────────────────────────────
 class _BottomWaves extends StatelessWidget {
-  const _BottomWaves({required this.ambientValue});
+  const _BottomWaves({required this.ambient});
 
-  final double ambientValue;
+  final double ambient;
 
   @override
   Widget build(BuildContext context) {
-    final double lift = 2.5 * math.sin(ambientValue * math.pi);
-
     return Positioned.fill(
       child: IgnorePointer(
         child: Transform.translate(
-          offset: Offset(0, lift),
-          child: CustomPaint(
-            painter: const _BottomWavesPainter(),
-          ),
+          offset: Offset(0, 2.8 * math.sin(ambient * math.pi)),
+          child: const CustomPaint(painter: _WavesPainter()),
         ),
       ),
     );
   }
 }
 
-class _BottomWavesPainter extends CustomPainter {
-  const _BottomWavesPainter();
+class _WavesPainter extends CustomPainter {
+  const _WavesPainter();
 
   @override
   void paint(Canvas canvas, Size size) {
-    final double baseY = size.height - math.min(126, size.height * 0.17);
+    final baseY = size.height - math.min(124.0, size.height * 0.165);
 
-    final Paint orangePaint = Paint()
-      ..color = _SplashColors.orange.withOpacity(0.92)
-      ..style = PaintingStyle.fill;
-    final Paint greenPaint = Paint()
-      ..color = _SplashColors.green.withOpacity(0.94)
-      ..style = PaintingStyle.fill;
-    final Paint whiteVeilPaint = Paint()
-      ..color = Colors.white.withOpacity(0.12)
-      ..style = PaintingStyle.fill;
+    final orangePaint = Paint()..color = _C.orange.withOpacity(0.93)..style = PaintingStyle.fill;
+    final greenPaint  = Paint()..color = _C.green.withOpacity(0.94)  ..style = PaintingStyle.fill;
+    final veilPaint   = Paint()..color = Colors.white.withOpacity(0.11)..style = PaintingStyle.fill;
 
-    final Path orangePath = Path()
-      ..moveTo(0, baseY + 18)
-      ..cubicTo(size.width * 0.14, baseY - 18, size.width * 0.30, baseY + 14,
-          size.width * 0.45, baseY - 6)
-      ..cubicTo(size.width * 0.34, baseY + 64, size.width * 0.20,
-          size.height + 12, 0, size.height)
+    // Vague orange (gauche)
+    final orange = Path()
+      ..moveTo(0, baseY + 16)
+      ..cubicTo(size.width * 0.14, baseY - 20,
+                size.width * 0.30, baseY + 16,
+                size.width * 0.46, baseY - 8)
+      ..cubicTo(size.width * 0.34, baseY + 62,
+                size.width * 0.18, size.height + 10,
+                0,                size.height)
       ..close();
 
-    final Path greenPath = Path()
-      ..moveTo(size.width, baseY - 4)
-      ..cubicTo(size.width * 0.82, baseY - 28, size.width * 0.67, baseY + 30,
-          size.width * 0.52, baseY + 2)
-      ..cubicTo(size.width * 0.64, baseY + 70, size.width * 0.82,
-          size.height + 14, size.width, size.height)
+    // Vague verte (droite)
+    final green = Path()
+      ..moveTo(size.width, baseY - 6)
+      ..cubicTo(size.width * 0.82, baseY - 30,
+                size.width * 0.66, baseY + 28,
+                size.width * 0.52, baseY + 2)
+      ..cubicTo(size.width * 0.64, baseY + 68,
+                size.width * 0.82, size.height + 14,
+                size.width,        size.height)
       ..close();
 
-    final Path orangeVeil = Path()
-      ..moveTo(0, baseY + 46)
-      ..cubicTo(size.width * 0.13, baseY + 18, size.width * 0.25, baseY + 45,
-          size.width * 0.38, baseY + 24)
+    // Voile blanc adoucissant la superposition orange/vert
+    final veil = Path()
+      ..moveTo(0, baseY + 44)
+      ..cubicTo(size.width * 0.12, baseY + 16,
+                size.width * 0.24, baseY + 44,
+                size.width * 0.38, baseY + 22)
       ..lineTo(0, size.height)
       ..close();
 
-    canvas.drawPath(orangePath, orangePaint);
-    canvas.drawPath(greenPath, greenPaint);
-    canvas.drawPath(orangeVeil, whiteVeilPaint);
+    canvas.drawPath(orange, orangePaint);
+    canvas.drawPath(green,  greenPaint);
+    canvas.drawPath(veil,   veilPaint);
   }
 
   @override
-  bool shouldRepaint(covariant _BottomWavesPainter oldDelegate) => false;
+  bool shouldRepaint(covariant _WavesPainter _) => false;
 }
 
-class _SplashSpacing {
-  const _SplashSpacing._();
+// ─────────────────────────────────────────────────────────────────────────────
+//  MICRO ORNEMENTS  (points • et étoiles ✦ autour de la mascotte)
+// ─────────────────────────────────────────────────────────────────────────────
+class _Ornament extends StatelessWidget {
+  const _Ornament._({required this.color, required this.size, required this.isStar});
 
-  static double horizontal(double width) => width < 360 ? 22 : 28;
-}
+  factory _Ornament.dot({required Color color, required double size}) =>
+      _Ornament._(color: color, size: size, isStar: false);
 
-class _SplashColors {
-  const _SplashColors._();
+  factory _Ornament.star({required Color color, double size = 15}) =>
+      _Ornament._(color: color, size: size, isStar: true);
 
-  static const Color ivory = Color(0xFFFFFCF4);
-  static const Color orange = Color(0xFFF58220);
-  static const Color orangeLight = Color(0xFFFFA94D);
-  static const Color green = Color(0xFF168A49);
-  static const Color textDark = Color(0xFF1F241F);
-  static const Color textSoft = Color(0xFF5F645B);
-  static const Color shadow = Color(0xFF3B2B18);
-  static const Color progressTrack = Color(0xFFF1E7D6);
-  static const Color dotBorder = Color(0xFFEADFCB);
+  final Color  color;
+  final double size;
+  final bool   isStar;
+
+  @override
+  Widget build(BuildContext context) {
+    if (isStar) {
+      return Icon(Icons.auto_awesome_rounded, color: color.withOpacity(0.68), size: size);
+    }
+    return Container(
+      width:  size,
+      height: size,
+      decoration: BoxDecoration(color: color.withOpacity(0.68), shape: BoxShape.circle),
+    );
+  }
 }
