@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:convert';
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
@@ -102,17 +103,29 @@ class _QuizScreenState extends State<QuizScreen> {
       );
 
       debugPrint('STATUS: ${response.statusCode}');
+      debugPrint('DATA TYPE: ${response.data.runtimeType}');
       debugPrint('DATA: ${response.data}');
 
-      if (response.data['success'] == true) {
-        final list = response.data['data'] as List;
-        debugPrint('QUESTIONS: ${list.length}');
+      final list = _extractQuestionsPayload(response.data);
+      final questions = list
+        .asMap()
+        .entries
+        .map((entry) => _normalizeQuestion(entry.value, entry.key))
+        .whereType<Map<String,dynamic>>()
+        .toList();
+
+      debugPrint('QUESTIONS PAYLOAD TYPE: ${list.runtimeType}');
+      debugPrint('QUESTIONS: ${questions.length}');
+
+      if (questions.isNotEmpty) {
         setState(() {
-          _questions = list.map((e) =>
-            Map<String,dynamic>.from(e)).toList();
+          _questions = questions;
           _isLoading = false;
         });
         _startTimer();
+      } else {
+        debugPrint('Aucune question exploitable dans la réponse API.');
+        setState(() => _isLoading = false);
       }
     } on DioException catch (e) {
       debugPrint('DIO ERROR: ${e.message}');
@@ -128,6 +141,156 @@ class _QuizScreenState extends State<QuizScreen> {
       debugPrint('ERROR: $e');
       setState(() => _isLoading = false);
     }
+  }
+
+  dynamic _decodeIfJsonString(dynamic payload) {
+    if (payload is! String) return payload;
+    try {
+      final decoded = jsonDecode(payload);
+      debugPrint('DATA DECODED TYPE: ${decoded.runtimeType}');
+      return decoded;
+    } on FormatException catch (e) {
+      debugPrint('DATA JSON DECODE ERROR: $e');
+      return payload;
+    }
+  }
+
+  List<dynamic> _extractQuestionsPayload(dynamic payload) {
+    final data = _decodeIfJsonString(payload);
+    debugPrint('ROOT PAYLOAD TYPE: ${data.runtimeType}');
+
+    if (data is List) {
+      debugPrint('ROOT PAYLOAD IS LIST: ${data.length} item(s)');
+      return data;
+    }
+
+    if (data is Map) {
+      debugPrint('ROOT PAYLOAD KEYS: ${data.keys.join(', ')}');
+      final nestedData = data['data'];
+      debugPrint('NESTED DATA TYPE: ${nestedData.runtimeType}');
+
+      if (nestedData is List) return nestedData;
+
+      if (nestedData is Map && nestedData['data'] is List) {
+        final nestedList = nestedData['data'] as List;
+        debugPrint('SECOND LEVEL DATA LIST: ${nestedList.length} item(s)');
+        return nestedList;
+      }
+    }
+
+    return const [];
+  }
+
+  Map<String,dynamic>? _normalizeQuestion(dynamic json, int index) {
+    if (json is! Map) {
+      debugPrint(
+        'QUESTION[$index] ignorée: type ${json.runtimeType} non supporté',
+      );
+      return null;
+    }
+
+    final question = _stringKeyMap(json);
+    final options = _normalizeOptions(question['options']);
+
+    question['id'] = _parseInt(question['id']) ?? index + 1;
+    question['question_text'] = _firstText(
+      question,
+      const ['question_text', 'question', 'text', 'label'],
+    );
+    question['explanation'] = _firstText(question, const ['explanation']);
+    question['difficulty'] = _parseInt(question['difficulty']) ?? 1;
+    question['options'] = options;
+
+    debugPrint(
+      'QUESTION[$index]: id=${question['id']}, '
+      'options=${options.length}, keys=${question.keys.join(', ')}',
+    );
+    return question;
+  }
+
+  List<Map<String,dynamic>> _normalizeOptions(dynamic json) {
+    if (json is! List) return <Map<String,dynamic>>[];
+    return json
+      .asMap()
+      .entries
+      .map((entry) => _normalizeOption(entry.value, entry.key))
+      .toList();
+  }
+
+  Map<String,dynamic> _normalizeOption(dynamic json, int index) {
+    if (json is String) {
+      return <String,dynamic>{
+        'id': index + 1,
+        'option_text': json,
+        'text': json,
+        'label': json,
+        'is_correct': false,
+      };
+    }
+
+    if (json is Map) {
+      final option = _stringKeyMap(json);
+      final text = _firstText(
+        option,
+        const ['option_text', 'text', 'label'],
+      );
+      option['id'] = _parseInt(option['id']) ?? index + 1;
+      option['option_text'] = text;
+      option['text'] = option['text']?.toString() ?? text;
+      option['label'] = option['label']?.toString() ?? text;
+      option['is_correct'] = _parseBool(option['is_correct']);
+      return option;
+    }
+
+    debugPrint(
+      'OPTION[$index] remplacée par une option vide: '
+      'type ${json.runtimeType} non supporté',
+    );
+    return <String,dynamic>{
+      'id': index + 1,
+      'option_text': '',
+      'text': '',
+      'label': '',
+      'is_correct': false,
+    };
+  }
+
+  List<Map<String,dynamic>> _optionsOf(Map<String,dynamic> question) {
+    final options = question['options'];
+    if (options is List<Map<String,dynamic>>) return options;
+    if (options is List) return _normalizeOptions(options);
+    return <Map<String,dynamic>>[];
+  }
+
+  Map<String,dynamic> _stringKeyMap(Map<dynamic,dynamic> json) {
+    return json.map(
+      (key, value) => MapEntry(key.toString(), value),
+    );
+  }
+
+  String _firstText(Map<String,dynamic> json, List<String> keys) {
+    for (final key in keys) {
+      final value = json[key];
+      if (value != null) return value.toString();
+    }
+    return '';
+  }
+
+  String _optionText(Map<String,dynamic> option) {
+    return _firstText(option, const ['option_text', 'text', 'label']);
+  }
+
+  int? _parseInt(dynamic value) {
+    if (value is int) return value;
+    if (value is num) return value.toInt();
+    return int.tryParse(value?.toString() ?? '');
+  }
+
+  bool _parseBool(dynamic value) {
+    if (value is bool) return value;
+    if (value is num) return value != 0;
+    final normalized = value?.toString().trim().toLowerCase();
+    return normalized == 'true' || normalized == '1' || normalized == 'yes';
   }
 
   void _startTimer() {
@@ -154,7 +317,7 @@ class _QuizScreenState extends State<QuizScreen> {
     final question = _questions[_currentIndex];
     bool isCorrect = false;
     if (optionId != null) {
-      final options = question['options'] as List;
+      final options = _optionsOf(question);
       final selected = options.firstWhere(
         (o) => o['id'] == optionId,
         orElse: () => <String, dynamic>{},
@@ -211,14 +374,15 @@ class _QuizScreenState extends State<QuizScreen> {
         },
       );
       debugPrint('SESSION: ${response.data}');
-      if (response.data['success'] == true) {
+      final sessionData = _decodeIfJsonString(response.data);
+      if (sessionData is Map && sessionData['success'] == true) {
         final prefs = await SharedPreferences
           .getInstance();
         await prefs.remove('home_cache');
         debugPrint('Cache Home invalidé');
         if (mounted) {
           context.go('/result',
-            extra: response.data['data']);
+            extra: sessionData['data']);
         }
       }
     } catch (e) {
@@ -465,7 +629,7 @@ class _QuizScreenState extends State<QuizScreen> {
 
   Widget _buildQuestionCard() {
     final question = _questions[_currentIndex];
-    final questionText = '${question['question_text'] ?? ''}';
+    final questionText = '${question['question_text'] ?? question['question'] ?? question['text'] ?? ''}';
 
     return LayoutBuilder(
       builder: (context, constraints) {
@@ -506,7 +670,7 @@ class _QuizScreenState extends State<QuizScreen> {
                       child: Align(
                         alignment: Alignment.centerLeft,
                         child: _buildDifficultyBadge(
-                          question['difficulty'] ?? 1,
+                          _parseInt(question['difficulty']) ?? 1,
                         ),
                       ),
                     ),
@@ -560,14 +724,14 @@ class _QuizScreenState extends State<QuizScreen> {
 
   Widget _buildExplanationCard() {
     final question = _questions[_currentIndex];
-    final options = question['options'] as List;
+    final options = _optionsOf(question);
     final correctOption = options.firstWhere(
       (o) => o['is_correct'] == true,
       orElse: () => <String, dynamic>{
         'option_text': '',
       },
     );
-    final correctText = '${correctOption['option_text'] ?? ''}';
+    final correctText = _optionText(correctOption);
     final explanation = '${question['explanation'] ?? ''}';
     final statusColor = _isCorrectAnswer ? _correct : _incorrect;
     final backgroundColor = _isCorrectAnswer
@@ -669,13 +833,12 @@ class _QuizScreenState extends State<QuizScreen> {
 
   Widget _buildOptions() {
     final question = _questions[_currentIndex];
-    final options = question['options'] as List;
+    final options = _optionsOf(question);
     final letters = ['A', 'B', 'C', 'D'];
     return Column(
       children: List.generate(options.length, (i) {
-        final option =
-          Map<String,dynamic>.from(options[i]);
-        final optionId = option['id'] as int;
+        final option = options[i];
+        final optionId = _parseInt(option['id']) ?? i + 1;
         final isSelected =
           _selectedOptionId == optionId;
         final isCorrectOption =
@@ -806,7 +969,7 @@ class _QuizScreenState extends State<QuizScreen> {
                     const SizedBox(width: 14),
                     Expanded(
                       child: Text(
-                        option['option_text'] ?? '',
+                        _optionText(option),
                         softWrap: true,
                         maxLines: null,
                         overflow: TextOverflow.visible,
