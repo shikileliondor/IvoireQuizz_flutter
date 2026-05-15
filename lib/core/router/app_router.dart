@@ -2,13 +2,13 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:go_router/go_router.dart';
-import 'package:google_fonts/google_fonts.dart';
 
 import '../../features/auth/screens/auth_screen.dart';
 import '../../features/friends/screens/friends_screen.dart';
 import '../../features/home/screens/all_categories_screen.dart';
 import '../../features/home/screens/home_screen.dart';
 import '../../features/leaderboard/screens/leaderboard_screen.dart';
+import '../../features/onboarding/screens/ivoire_quiz_splash_screen.dart';
 import '../../features/onboarding/screens/onboarding_screen.dart';
 import '../../features/profile/screens/profile_screen.dart';
 import '../../features/quiz/screens/quiz_screen.dart';
@@ -119,93 +119,15 @@ final Provider<GoRouter> routerProvider = Provider<GoRouter>((Ref ref) {
 // ══════════════════════════════════════════════
 //  SPLASH SCREEN
 // ══════════════════════════════════════════════
-class SplashScreen extends StatefulWidget {
+class SplashScreen extends StatelessWidget {
   const SplashScreen({super.key});
 
-  @override
-  State<SplashScreen> createState() => _SplashScreenState();
-}
-
-class _SplashScreenState extends State<SplashScreen>
-    with TickerProviderStateMixin {
-
-  late final AnimationController _entryCtrl;
-  late final AnimationController _pulseCtrl;
-
-  // Title : scale + fade
-  late final Animation<double> _titleScale;
-  late final Animation<double> _titleFade;
-
-  // Subtitle + loader : fade + slide
-  late final Animation<double> _subFade;
-  late final Animation<Offset> _subSlide;
-
-  // Image : fade
-  late final Animation<double> _imgFade;
-
-  // Pulse continu sur le titre
-  late final Animation<double> _pulse;
-
-  @override
-  void initState() {
-    super.initState();
-
-    _entryCtrl = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 1100),
-    );
-
-    _pulseCtrl = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 1800),
-    )..repeat(reverse: true);
-
-    _titleScale = CurvedAnimation(
-      parent: _entryCtrl,
-      curve: const Interval(0.0, 0.6, curve: Curves.elasticOut),
-    ).drive(Tween<double>(begin: 0.5, end: 1.0));
-
-    _titleFade = CurvedAnimation(
-      parent: _entryCtrl,
-      curve: const Interval(0.0, 0.4, curve: Curves.easeIn),
-    ).drive(Tween<double>(begin: 0.0, end: 1.0));
-
-    _subFade = CurvedAnimation(
-      parent: _entryCtrl,
-      curve: const Interval(0.45, 0.9, curve: Curves.easeOut),
-    ).drive(Tween<double>(begin: 0.0, end: 1.0));
-
-    _subSlide = CurvedAnimation(
-      parent: _entryCtrl,
-      curve: const Interval(0.45, 0.9, curve: Curves.easeOut),
-    ).drive(Tween<Offset>(begin: const Offset(0, 0.25), end: Offset.zero));
-
-    _imgFade = CurvedAnimation(
-      parent: _entryCtrl,
-      curve: const Interval(0.65, 1.0, curve: Curves.easeOut),
-    ).drive(Tween<double>(begin: 0.0, end: 1.0));
-
-    _pulse = CurvedAnimation(parent: _pulseCtrl, curve: Curves.easeInOut)
-        .drive(Tween<double>(begin: 0.97, end: 1.03));
-
-    _entryCtrl.forward();
-    _checkAuth();
-  }
-
-  @override
-  void dispose() {
-    _entryCtrl.dispose();
-    _pulseCtrl.dispose();
-    super.dispose();
-  }
-
-  Future<void> _checkAuth() async {
-    await Future<void>.delayed(const Duration(seconds: 2));
-    if (!mounted) return;
-
+  Future<void> _navigateAfterSplash(BuildContext context) async {
     const FlutterSecureStorage storage = FlutterSecureStorage();
-    final String? token          = await storage.read(key: 'auth_token');
+    final String? token = await storage.read(key: 'auth_token');
     final String? onboardingDone = await storage.read(key: 'onboarding_done');
+
+    if (!context.mounted) return;
 
     if (token != null) {
       context.go('/home');
@@ -218,152 +140,9 @@ class _SplashScreenState extends State<SplashScreen>
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: AppColors.orange,
-      body: SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 32),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: <Widget>[
-              const Spacer(),
-
-              // ── Image centrée ───────────────────────────
-              FadeTransition(
-                opacity: _imgFade,
-                child: Image.asset(
-                  'assets/avecfodn.jpeg',
-                  height: 100,
-                  errorBuilder: (ctx, err, st) => Text(
-                    'Image non trouvée: $err',
-                    style: const TextStyle(color: Colors.white, fontSize: 10),
-                  ),
-                ),
-              ),
-
-              const SizedBox(height: 28),
-
-              // ── Titre animé ─────────────────────────────
-              AnimatedBuilder(
-                animation: Listenable.merge([_entryCtrl, _pulseCtrl]),
-                builder: (_, __) {
-                  return FadeTransition(
-                    opacity: _titleFade,
-                    child: Transform.scale(
-                      scale: _titleScale.value * _pulse.value,
-                      child: Text(
-                        'IvoireQuiz',
-                        textAlign: TextAlign.center,
-                        style: GoogleFonts.nunito(
-                          color: const Color.fromARGB(255, 195, 33, 33),
-                          fontSize: 42,
-                          fontWeight: FontWeight.w900,
-                          shadows: const [
-                            Shadow(
-                              color: Color(0x55000000),
-                              offset: Offset(0, 4),
-                              blurRadius: 12,
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
-                  );
-                },
-              ),
-
-              const SizedBox(height: 10),
-
-              // ── Sous-titre slide-up ─────────────────────
-              FadeTransition(
-                opacity: _subFade,
-                child: SlideTransition(
-                  position: _subSlide,
-                  child: Text(
-                    'Connais-tu vraiment\nla Côte d\'Ivoire ?',
-                    textAlign: TextAlign.center,
-                    style: GoogleFonts.nunito(
-                      color: AppColors.white,
-                      fontSize: 14,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                ),
-              ),
-
-              const Spacer(),
-
-              // ── Loader ──────────────────────────────────
-              FadeTransition(
-                opacity: _subFade,
-                child: const _ThreeDots(),
-              ),
-
-              const SizedBox(height: 32),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-// ── 3 dots qui pulsent en décalé ────────────────
-class _ThreeDots extends StatefulWidget {
-  const _ThreeDots();
-
-  @override
-  State<_ThreeDots> createState() => _ThreeDotsState();
-}
-
-class _ThreeDotsState extends State<_ThreeDots>
-    with SingleTickerProviderStateMixin {
-  late final AnimationController _ctrl;
-
-  @override
-  void initState() {
-    super.initState();
-    _ctrl = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 1000),
-    )..repeat();
-  }
-
-  @override
-  void dispose() {
-    _ctrl.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return AnimatedBuilder(
-      animation: _ctrl,
-      builder: (_, __) {
-        return Row(
-          mainAxisSize: MainAxisSize.min,
-          children: List.generate(3, (i) {
-            // chaque dot est décalé d'1/3 de cycle
-            final double t = (_ctrl.value + i / 3) % 1.0;
-            // monte et descend en douceur
-            final double offset = -8 * (1 - (t * 2 - 1).abs());
-            return Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 4),
-              child: Transform.translate(
-                offset: Offset(0, offset),
-                child: Container(
-                  width: 10,
-                  height: 10,
-                  decoration: const BoxDecoration(
-                    shape: BoxShape.circle,
-                    color: AppColors.white,
-                  ),
-                ),
-              ),
-            );
-          }),
-        );
-      },
+    return IvoireQuizSplashScreen(
+      autoNavigate: true,
+      onAnimationComplete: () => _navigateAfterSplash(context),
     );
   }
 }
