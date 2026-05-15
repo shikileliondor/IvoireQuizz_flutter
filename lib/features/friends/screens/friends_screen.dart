@@ -31,7 +31,13 @@ class _FriendsScreenState extends State<FriendsScreen> {
   @override
   void initState() {
     super.initState();
-    _loadData();
+    _loadFriendsOnce();
+  }
+
+  @override
+  void dispose() {
+    _loadDataFuture = null;
+    super.dispose();
   }
 
   Future<Dio> _createDio() async {
@@ -39,45 +45,49 @@ class _FriendsScreenState extends State<FriendsScreen> {
     return ApiConfig.createDio(authToken: token);
   }
 
-  Future<void> _loadData() {
+  Future<void> _loadFriendsOnce() {
     final Future<void>? runningLoad = _loadDataFuture;
     if (runningLoad != null) return runningLoad;
 
-    final Future<void> load = _loadDataInternal();
+    final Future<void> load = _loadFriends();
     _loadDataFuture = load;
-    load.whenComplete(() => _loadDataFuture = null);
     return load;
   }
 
-  Future<void> _loadDataInternal() async {
-    if (mounted) {
-      setState(() => _isLoading = true);
-    }
+  Future<void> _loadFriends() async {
+    if (!mounted) return;
+
+    setState(() => _isLoading = true);
 
     try {
-      final dio = await _createDio();
-      final results = await Future.wait<Response<dynamic>>(<Future<Response<dynamic>>>[
-        dio.get<dynamic>('/friends'),
-        dio.get<dynamic>('/friends/requests'),
-      ]);
+      final Dio dio = await _createDio();
+      if (!mounted) return;
 
-      final friendsData = _extractList(results[0].data);
-      final requestsData = _extractList(results[1].data);
+      final List<Response<dynamic>> results = await Future.wait<Response<dynamic>>(
+        <Future<Response<dynamic>>>[
+          dio.get<dynamic>('/friends'),
+          dio.get<dynamic>('/friends/requests'),
+        ],
+      );
+      if (!mounted) return;
 
-      if (!mounted) {
-        return;
-      }
+      final List<Map<String, dynamic>> friendsData = _extractList(results[0].data);
+      final List<Map<String, dynamic>> requestsData = _extractList(results[1].data);
 
       setState(() {
         _friends = friendsData;
         _requests = requestsData;
-        _isLoading = false;
       });
     } catch (e) {
       debugPrint('FRIENDS ERROR: $e');
-      if (mounted) {
-        setState(() => _isLoading = false);
-      }
+      if (!mounted) return;
+    } finally {
+      if (!mounted) return;
+
+      setState(() {
+        _isLoading = false;
+        _loadDataFuture = null;
+      });
     }
   }
 
@@ -95,15 +105,14 @@ class _FriendsScreenState extends State<FriendsScreen> {
 
   Future<void> _addFriend(String friendCode) async {
     try {
-      final dio = await _createDio();
+      final Dio dio = await _createDio();
+      if (!mounted) return;
+
       await dio.post<dynamic>(
         '/friends/add',
         data: <String, String>{'friend_code': friendCode},
       );
-
-      if (!mounted) {
-        return;
-      }
+      if (!context.mounted) return;
 
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
@@ -114,9 +123,10 @@ class _FriendsScreenState extends State<FriendsScreen> {
           backgroundColor: _correct,
         ),
       );
-      await _loadData();
+
+      await _loadFriendsOnce();
     } on DioException catch (e) {
-      if (!mounted) {
+      if (!context.mounted) {
         return;
       }
 
@@ -139,9 +149,13 @@ class _FriendsScreenState extends State<FriendsScreen> {
 
   Future<void> _acceptRequest(int id) async {
     try {
-      final dio = await _createDio();
+      final Dio dio = await _createDio();
+      if (!mounted) return;
+
       await dio.put<dynamic>('/friends/$id/accept');
-      await _loadData();
+      if (!mounted) return;
+
+      await _loadFriendsOnce();
     } catch (e) {
       debugPrint('ACCEPT ERROR: $e');
     }
@@ -149,9 +163,13 @@ class _FriendsScreenState extends State<FriendsScreen> {
 
   Future<void> _deleteRequest(int id) async {
     try {
-      final dio = await _createDio();
+      final Dio dio = await _createDio();
+      if (!mounted) return;
+
       await dio.delete<dynamic>('/friends/$id');
-      await _loadData();
+      if (!mounted) return;
+
+      await _loadFriendsOnce();
     } catch (e) {
       debugPrint('DELETE ERROR: $e');
     }
@@ -283,7 +301,7 @@ class _FriendsScreenState extends State<FriendsScreen> {
       body: SafeArea(
         child: RefreshIndicator(
           color: _orange,
-          onRefresh: _loadData,
+          onRefresh: _loadFriendsOnce,
           child: CustomScrollView(
             slivers: <Widget>[
               SliverToBoxAdapter(

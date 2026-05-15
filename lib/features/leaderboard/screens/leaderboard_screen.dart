@@ -42,17 +42,24 @@ class _LeaderboardScreenState extends State<LeaderboardScreen> with SingleTicker
     _tabController = TabController(length: 2, vsync: this);
     _loadCurrentUser();
     _loadGlobal();
-    _tabController.addListener(() {
-      if (_tabController.index == 1 && _friendsList.isEmpty && !_isLoadingFriends) {
-        _loadFriends();
-      }
-    });
+    _tabController.addListener(_handleTabChanged);
   }
 
   @override
   void dispose() {
+    _tabController.removeListener(_handleTabChanged);
+    _currentUserLoadFuture = null;
+    _globalLoadFuture = null;
+    _friendsLoadFuture = null;
     _tabController.dispose();
     super.dispose();
+  }
+
+  void _handleTabChanged() {
+    if (!mounted) return;
+    if (_tabController.index == 1 && _friendsList.isEmpty && !_isLoadingFriends) {
+      _loadFriends();
+    }
   }
 
   Future<Dio> _createDio() async {
@@ -66,14 +73,16 @@ class _LeaderboardScreenState extends State<LeaderboardScreen> with SingleTicker
 
     final Future<void> load = _loadCurrentUserInternal();
     _currentUserLoadFuture = load;
-    load.whenComplete(() => _currentUserLoadFuture = null);
     return load;
   }
 
   Future<void> _loadCurrentUserInternal() async {
     try {
       final Dio dio = await _createDio();
+      if (!mounted) return;
+
       final Response<dynamic> response = await dio.get<dynamic>('/auth/me');
+      if (!mounted) return;
       final dynamic data = response.data;
       final dynamic userData = data is Map<String, dynamic> ? data['data'] : null;
 
@@ -83,11 +92,16 @@ class _LeaderboardScreenState extends State<LeaderboardScreen> with SingleTicker
         if (user is Map && user['id'] != null) {
           final int? id = int.tryParse(user['id'].toString());
           if (!mounted) return;
-          setState(() => _currentUserId = id);
+          setState(() {
+            _currentUserId = id;
+            _currentUserLoadFuture = null;
+          });
         }
       }
     } catch (e) {
       debugPrint('USER ERROR: $e');
+      if (!mounted) return;
+      _currentUserLoadFuture = null;
     }
   }
 
@@ -97,7 +111,6 @@ class _LeaderboardScreenState extends State<LeaderboardScreen> with SingleTicker
 
     final Future<void> load = _loadGlobalInternal();
     _globalLoadFuture = load;
-    load.whenComplete(() => _globalLoadFuture = null);
     return load;
   }
 
@@ -108,7 +121,10 @@ class _LeaderboardScreenState extends State<LeaderboardScreen> with SingleTicker
 
     try {
       final Dio dio = await _createDio();
+      if (!mounted) return;
+
       final Response<dynamic> response = await dio.get<dynamic>('/leaderboard/global');
+      if (!mounted) return;
       final dynamic payload = response.data;
       final dynamic data = payload is Map<String, dynamic> ? payload['data'] : null;
 
@@ -134,11 +150,15 @@ class _LeaderboardScreenState extends State<LeaderboardScreen> with SingleTicker
         _globalList = mapped;
         _currentUserRank = rank;
         _isLoadingGlobal = false;
+        _globalLoadFuture = null;
       });
     } catch (e) {
       debugPrint('GLOBAL ERROR: $e');
       if (!mounted) return;
-      setState(() => _isLoadingGlobal = false);
+      setState(() {
+        _isLoadingGlobal = false;
+        _globalLoadFuture = null;
+      });
     }
   }
 
@@ -148,7 +168,6 @@ class _LeaderboardScreenState extends State<LeaderboardScreen> with SingleTicker
 
     final Future<void> load = _loadFriendsInternal();
     _friendsLoadFuture = load;
-    load.whenComplete(() => _friendsLoadFuture = null);
     return load;
   }
 
@@ -159,7 +178,10 @@ class _LeaderboardScreenState extends State<LeaderboardScreen> with SingleTicker
 
     try {
       final Dio dio = await _createDio();
+      if (!mounted) return;
+
       final Response<dynamic> response = await dio.get<dynamic>('/leaderboard/friends');
+      if (!mounted) return;
       final dynamic payload = response.data;
       final dynamic data = payload is Map<String, dynamic> ? payload['data'] : null;
 
@@ -181,11 +203,15 @@ class _LeaderboardScreenState extends State<LeaderboardScreen> with SingleTicker
       setState(() {
         _friendsList = mapped;
         _isLoadingFriends = false;
+        _friendsLoadFuture = null;
       });
     } catch (e) {
       debugPrint('FRIENDS ERROR: $e');
       if (!mounted) return;
-      setState(() => _isLoadingFriends = false);
+      setState(() {
+        _isLoadingFriends = false;
+        _friendsLoadFuture = null;
+      });
     }
   }
 

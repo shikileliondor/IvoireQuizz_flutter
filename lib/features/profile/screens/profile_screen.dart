@@ -37,13 +37,18 @@ class _ProfileScreenState extends State<ProfileScreen> {
     _loadData();
   }
 
+  @override
+  void dispose() {
+    _loadDataFuture = null;
+    super.dispose();
+  }
+
   Future<void> _loadData() {
     final Future<void>? runningLoad = _loadDataFuture;
     if (runningLoad != null) return runningLoad;
 
     final Future<void> load = _loadDataInternal();
     _loadDataFuture = load;
-    load.whenComplete(() => _loadDataFuture = null);
     return load;
   }
 
@@ -53,9 +58,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
     }
     try {
       final token = await _storage.read(key: 'auth_token');
+      if (!mounted) return;
 
       if (token == null) {
-        if (mounted) context.go('/auth');
+        context.go('/auth');
         return;
       }
 
@@ -83,22 +89,28 @@ class _ProfileScreenState extends State<ProfileScreen> {
           _stats = Map<String, dynamic>.from(statsData);
         }
         _isLoading = false;
+        _loadDataFuture = null;
       });
     } on DioException catch (e) {
       debugPrint('ERREUR PROFIL: $e');
       if (e.response?.statusCode == 401) {
         await _storage.delete(key: 'auth_token');
-        if (mounted) context.go('/auth');
+        if (!context.mounted) return;
+        context.go('/auth');
         return;
       }
-      if (mounted) {
-        setState(() => _isLoading = false);
-      }
+      if (!mounted) return;
+      setState(() {
+        _isLoading = false;
+        _loadDataFuture = null;
+      });
     } catch (e) {
       debugPrint('ERREUR: $e');
-      if (mounted) {
-        setState(() => _isLoading = false);
-      }
+      if (!mounted) return;
+      setState(() {
+        _isLoading = false;
+        _loadDataFuture = null;
+      });
     }
   }
 
@@ -108,13 +120,17 @@ class _ProfileScreenState extends State<ProfileScreen> {
     }
     try {
       final token = await _storage.read(key: 'auth_token');
+      if (!mounted) return;
+
       final dio = ApiConfig.createDio(authToken: token);
       await dio.post('/auth/logout');
+      if (!mounted) return;
     } catch (e) {
       debugPrint('LOGOUT ERROR: $e');
     } finally {
       await _storage.deleteAll();
-      if (mounted) context.go('/auth');
+      if (!context.mounted) return;
+      context.go('/auth');
     }
   }
 
