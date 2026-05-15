@@ -83,8 +83,21 @@ class _FriendsScreenState extends State<FriendsScreen> {
       );
       if (!mounted) return;
 
-      final List<Map<String, dynamic>> friendsData = _extractList(results[0].data);
-      final List<Map<String, dynamic>> requestsData = _extractList(results[1].data);
+      final List<Map<String, dynamic>> friendsData = _extractList(
+        results[0].data,
+        preferredKeys: const <String>['friends'],
+      );
+      final List<Map<String, dynamic>> requestsData = _extractList(
+        results[1].data,
+        preferredKeys: const <String>[
+          'received_requests',
+          'received',
+          'incoming_requests',
+          'incoming',
+          'requests',
+          'friend_requests',
+        ],
+      );
 
       setState(() {
         _friends = friendsData;
@@ -103,16 +116,102 @@ class _FriendsScreenState extends State<FriendsScreen> {
     }
   }
 
-  List<Map<String, dynamic>> _extractList(dynamic responseData) {
-    final data = responseData is Map<String, dynamic> ? responseData['data'] : null;
-    if (data is! List) {
+  List<Map<String, dynamic>> _extractList(
+    dynamic responseData, {
+    List<String> preferredKeys = const <String>[],
+  }) {
+    final dynamic listData = _findListPayload(responseData, preferredKeys);
+    if (listData is! List) {
       return <Map<String, dynamic>>[];
     }
 
-    return data
+    return listData
         .whereType<Map>()
-        .map((e) => Map<String, dynamic>.from(e as Map<dynamic, dynamic>))
+        .map((Map<dynamic, dynamic> e) => _normalizeMap(e))
         .toList();
+  }
+
+  dynamic _findListPayload(dynamic payload, List<String> preferredKeys) {
+    if (payload is List) return payload;
+    if (payload is! Map) return null;
+
+    final Map<String, dynamic> normalized = _normalizeMap(payload);
+    for (final String key in <String>[
+      ...preferredKeys,
+      'data',
+      'items',
+      'results',
+      'users',
+      'friends',
+      'requests',
+      'friend_requests',
+      'received_requests',
+      'received',
+      'incoming_requests',
+      'incoming',
+      'pending_requests',
+      'pending',
+    ]) {
+      final dynamic value = normalized[key];
+      if (value is List) return value;
+      if (value is Map) {
+        final dynamic nested = _findListPayload(value, preferredKeys);
+        if (nested is List) return nested;
+      }
+    }
+
+    final dynamic data = normalized['data'];
+    if (data is Map) {
+      final dynamic nested = _findListPayload(data, preferredKeys);
+      if (nested is List) return nested;
+    }
+
+    return null;
+  }
+
+  Map<String, dynamic> _normalizeMap(Map<dynamic, dynamic> map) {
+    return map.map(
+      (dynamic key, dynamic value) => MapEntry<String, dynamic>(
+        key.toString(),
+        value,
+      ),
+    );
+  }
+
+  Map<String, dynamic> _nestedMap(Map<String, dynamic> map, List<String> keys) {
+    for (final String key in keys) {
+      final dynamic value = map[key];
+      if (value is Map) {
+        return _normalizeMap(value);
+      }
+    }
+
+    return <String, dynamic>{};
+  }
+
+  int _extractId(Map<String, dynamic> map, List<String> keys) {
+    for (final String key in keys) {
+      final dynamic value = map[key];
+      if (value is int) return value;
+      final int? parsed = int.tryParse(value?.toString() ?? '');
+      if (parsed != null) return parsed;
+    }
+
+    return -1;
+  }
+
+  String _extractName(Map<String, dynamic> map) {
+    for (final String key in <String>[
+      'name',
+      'username',
+      'full_name',
+      'display_name',
+    ]) {
+      final String? value = map[key]?.toString().trim();
+      if (value != null && value.isNotEmpty) return value;
+    }
+
+    return 'Ami';
   }
 
   Future<bool> _addFriend(String friendCode) async {
@@ -484,14 +583,29 @@ class _FriendsScreenState extends State<FriendsScreen> {
                     delegate: SliverChildBuilderDelegate(
                       (BuildContext context, int index) {
                         final req = _requests[index];
-                        final requesterRaw = req['requester'];
-                        final requester = requesterRaw is Map<String, dynamic>
-                            ? requesterRaw
-                            : req;
+                        final Map<String, dynamic> requester = _nestedMap(
+                          req,
+                          const <String>[
+                            'requester',
+                            'sender',
+                            'from',
+                            'user',
+                            'friend',
+                          ],
+                        );
+                        final Map<String, dynamic> requesterData =
+                            requester.isNotEmpty ? requester : req;
 
-                        final name = requester['name']?.toString() ?? '';
-                        final id = req['id'];
-                        final requestId = id is int ? id : int.tryParse(id.toString()) ?? -1;
+                        final String name = _extractName(requesterData);
+                        final int requestId = _extractId(
+                          req,
+                          const <String>[
+                            'id',
+                            'request_id',
+                            'friend_request_id',
+                            'friendship_id',
+                          ],
+                        );
 
                         return Padding(
                           padding: const EdgeInsets.fromLTRB(20, 0, 20, 10),
@@ -634,10 +748,29 @@ class _FriendsScreenState extends State<FriendsScreen> {
                   delegate: SliverChildBuilderDelegate(
                     (BuildContext context, int index) {
                       final friend = _friends[index];
-                      final name = friend['name']?.toString() ?? '';
-                      final score = friend['total_score'] ?? 0;
-                      final id = friend['id'];
-                      final friendId = id is int ? id : int.tryParse(id.toString()) ?? -1;
+                      final Map<String, dynamic> friendUser = _nestedMap(
+                        friend,
+                        const <String>[
+                          'friend',
+                          'user',
+                          'recipient',
+                          'requester',
+                        ],
+                      );
+                      final Map<String, dynamic> friendData =
+                          friendUser.isNotEmpty ? friendUser : friend;
+                      final String name = _extractName(friendData);
+                      final Object score =
+                          friendData['total_score'] ?? friend['total_score'] ?? 0;
+                      final int friendId = _extractId(
+                        friend,
+                        const <String>[
+                          'id',
+                          'friendship_id',
+                          'friend_id',
+                          'user_id',
+                        ],
+                      );
 
                       return Padding(
                         padding: const EdgeInsets.fromLTRB(20, 0, 20, 10),
