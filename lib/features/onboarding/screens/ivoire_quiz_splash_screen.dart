@@ -9,8 +9,8 @@ import 'package:google_fonts/google_fonts.dart';
 //  PALETTE CENTRALISÉE
 // ─────────────────────────────────────────────────────────────────────────────
 abstract final class _C {
-  /// Fond principal : blanc ivoire très doux — homogène avec le reste de l'app.
-  static const Color bg           = Color(0xFFFFFCF4);
+  /// Fond principal : blanc pur, aligné avec le blanc intégré à l'image.
+  static const Color bg           = Color(0xFFFFFFFF);
 
   // Marque
   static const Color orange       = Color(0xFFF58220);
@@ -265,7 +265,7 @@ class _MainContent extends StatelessWidget {
 
 // ─────────────────────────────────────────────────────────────────────────────
 //  MASCOTTE
-//  ─ Le ColoredBox parent a EXACTEMENT la même couleur que le Scaffold
+//  ─ Le ColoredBox parent a EXACTEMENT le même blanc pur que le Scaffold
 //    → l'image (fond blanc intégré) se fond naturellement dans la page.
 //  ─ Aucune carte, aucune ombre forte, aucun cadre visible.
 // ─────────────────────────────────────────────────────────────────────────────
@@ -277,7 +277,7 @@ class _Mascot extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return ColoredBox(
-      color: _C.bg, // identique au fond du Scaffold → fondu parfait
+      color: _C.bg, // blanc pur identique au fond du Scaffold → fondu parfait
       child: SizedBox(
         width:  size,
         height: size,
