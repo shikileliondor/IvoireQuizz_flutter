@@ -277,12 +277,12 @@ class _Mascot extends StatelessWidget {
             ),
           ),
           Image.asset(
-            'assets/images/ivoire_quiz_elephant.png',
+            'assets/avecfodn.jpeg',
             width: size,
             height: size,
             fit: BoxFit.contain,
             errorBuilder: (BuildContext context, Object error, StackTrace? stack) {
-              // Remplacer par assets/images/ivoire_quiz_elephant.png dès que la mascotte finale est disponible.
+              // Remplacer par assets/images/ivoire_quiz_elephant.png si la mascotte finale est ajoutée plus tard.
               return _MascotPlaceholder(size: size);
             },
           ),
