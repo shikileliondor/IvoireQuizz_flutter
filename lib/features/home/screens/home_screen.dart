@@ -35,6 +35,12 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     _loadData();
   }
 
+  @override
+  void dispose() {
+    _loadDataFuture = null;
+    super.dispose();
+  }
+
   Future<void> _loadData() {
     final Future<void>? runningLoad = _loadDataFuture;
     if (runningLoad != null) {
@@ -43,7 +49,6 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
 
     final Future<void> load = _loadDataInternal();
     _loadDataFuture = load;
-    load.whenComplete(() => _loadDataFuture = null);
     return load;
   }
 
@@ -53,11 +58,16 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
 
     // ÉTAPE 2 : Charger les données essentielles depuis l'API.
     await _loadFromApi();
+
+    if (!mounted) return;
+    _loadDataFuture = null;
   }
 
   Future<void> _loadFromCache() async {
     try {
       final prefs = await SharedPreferences.getInstance();
+      if (!mounted) return;
+
       final cached = prefs.getString('home_cache');
       if (cached != null) {
         final data = jsonDecode(cached) as Map<String, dynamic>;
@@ -97,21 +107,20 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   Future<void> _loadFromApi() async {
     try {
       final token = await const FlutterSecureStorage().read(key: 'auth_token');
+      if (!mounted) return;
 
       if (token == null) {
-        if (mounted) context.go('/auth');
+        context.go('/auth');
         return;
       }
 
       final dio = ApiConfig.createDio(authToken: token);
 
-      if (mounted) {
-        setState(() {
-          _loadingCategories = _categories.isEmpty;
-          _loadingSession = _lastSession == null;
-          _isLoading = _user == null && _categories.isEmpty;
-        });
-      }
+      setState(() {
+        _loadingCategories = _categories.isEmpty;
+        _loadingSession = _lastSession == null;
+        _isLoading = _user == null && _categories.isEmpty;
+      });
 
       // Données essentielles pour rendre la Home : utilisateur + catégories.
       // Elles partent en parallèle et ne sont plus bloquées par l'historique.
@@ -151,25 +160,24 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
       debugPrint('API ERROR: $e');
       if (e.response?.statusCode == 401) {
         await const FlutterSecureStorage().delete(key: 'auth_token');
-        if (mounted) context.go('/auth');
+        if (!context.mounted) return;
+        context.go('/auth');
         return;
       }
-      if (mounted) {
-        setState(() {
-          _isLoading = false;
-          _loadingCategories = false;
-          _loadingSession = false;
-        });
-      }
+      if (!mounted) return;
+      setState(() {
+        _isLoading = false;
+        _loadingCategories = false;
+        _loadingSession = false;
+      });
     } catch (e) {
       debugPrint('ERROR: $e');
-      if (mounted) {
-        setState(() {
-          _isLoading = false;
-          _loadingCategories = false;
-          _loadingSession = false;
-        });
-      }
+      if (!mounted) return;
+      setState(() {
+        _isLoading = false;
+        _loadingCategories = false;
+        _loadingSession = false;
+      });
     }
   }
 
@@ -195,7 +203,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
       await _saveHomeCache();
     } catch (e) {
       debugPrint('SESSION API ERROR: $e');
-      if (mounted) setState(() => _loadingSession = false);
+      if (!mounted) return;
+      setState(() => _loadingSession = false);
     }
   }
 
