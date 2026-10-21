@@ -11,7 +11,7 @@ import '../../../core/config/api_config.dart';
 
 class AuthScreen extends StatefulWidget {
   final bool showLogin;
-  const AuthScreen({super.key, this.showLogin = false});
+  const AuthScreen({super.key, this.showLogin = true});
 
   @override
   State<AuthScreen> createState() => _AuthScreenState();

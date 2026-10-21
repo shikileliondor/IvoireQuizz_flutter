@@ -443,7 +443,10 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                 ),
                 const SizedBox(height: 12),
                 GestureDetector(
-                  onTap: _finishOnboarding,
+                onTap: () async {
+                  await _storage.write(key: 'onboarding_done', value: 'true');
+                  if (mounted) context.go('/auth?mode=login');
+                },
                   child: RichText(
                     text: TextSpan(
                       children: [

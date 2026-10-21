@@ -5,8 +5,10 @@ import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../../core/config/api_config.dart';
+import '../../../main.dart' show appTextScale, appHighContrast, appReduceMotion;
 
 const _orange = Color(0xFFF77F00);
 const _gold = Color(0xFFFFD700);
@@ -26,10 +28,92 @@ class ProfileScreen extends StatefulWidget {
 class _ProfileScreenState extends State<ProfileScreen> {
   Map<String, dynamic>? _user;
   Map<String, dynamic>? _stats;
+  List<Map<String, dynamic>> _recentSessions = [];
+  List<Map<String, dynamic>> _badges = [];
+  List<Map<String, dynamic>> _objectives = [];
   bool _isLoading = true;
   bool _isLoggingOut = false;
+  bool _accessibilityExpanded = false;
   Future<void>? _loadDataFuture;
   static const _storage = FlutterSecureStorage();
+
+  Widget _accessibilitySettings() {
+    return ValueListenableBuilder<double>(
+      valueListenable: appTextScale,
+      builder: (context, scale, _) => ValueListenableBuilder<bool>(
+        valueListenable: appHighContrast,
+        builder: (context, contrast, _) => ValueListenableBuilder<bool>(
+          valueListenable: appReduceMotion,
+          builder: (context, reduceMotion, _) => Card(
+            margin: const EdgeInsets.fromLTRB(20, 20, 20, 0),
+            child: Theme(
+              data:
+                  Theme.of(context).copyWith(dividerColor: Colors.transparent),
+              child: ExpansionTile(
+                initiallyExpanded: _accessibilityExpanded,
+                onExpansionChanged: (expanded) =>
+                    setState(() => _accessibilityExpanded = expanded),
+                leading: const Icon(Icons.accessibility_new, color: _orange),
+                title: Text('Accessibilité',
+                    style: GoogleFonts.nunito(
+                      fontWeight: FontWeight.w800,
+                      fontSize: 16,
+                      color: _textDark,
+                    )),
+                subtitle: const Text('Réglages d’affichage'),
+                children: [
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+                    child: Column(children: [
+                      Row(children: [
+                        const Icon(Icons.text_fields),
+                        Expanded(
+                            child: Slider(
+                          semanticFormatterCallback: (v) =>
+                              'Taille du texte ${v.toStringAsFixed(1)}',
+                          min: 1,
+                          max: 1.4,
+                          divisions: 4,
+                          value: scale,
+                          onChanged: (v) async {
+                            appTextScale.value = v;
+                            final p = await SharedPreferences.getInstance();
+                            await p.setDouble('accessibility_text_scale', v);
+                          },
+                        )),
+                      ]),
+                      SwitchListTile(
+                        contentPadding: EdgeInsets.zero,
+                        secondary: const Icon(Icons.contrast),
+                        title: const Text('Contraste renforcé'),
+                        value: contrast,
+                        onChanged: (v) async {
+                          appHighContrast.value = v;
+                          final p = await SharedPreferences.getInstance();
+                          await p.setBool('accessibility_high_contrast', v);
+                        },
+                      ),
+                      SwitchListTile(
+                        contentPadding: EdgeInsets.zero,
+                        secondary: const Icon(Icons.motion_photos_off_outlined),
+                        title: const Text('Réduire les animations'),
+                        value: reduceMotion,
+                        onChanged: (v) async {
+                          appReduceMotion.value = v;
+                          final p = await SharedPreferences.getInstance();
+                          await p.setBool('accessibility_reduce_motion', v);
+                        },
+                      ),
+                    ]),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
 
   @override
   void initState() {
@@ -70,10 +154,14 @@ class _ProfileScreenState extends State<ProfileScreen> {
       final results = await Future.wait([
         dio.get('/auth/me'),
         dio.get('/profile/stats'),
+        dio.get('/sessions'),
+        dio.get('/achievements'),
       ]);
 
       final userData = (results[0].data as Map<String, dynamic>)['data'];
       final statsData = (results[1].data as Map<String, dynamic>)['data'];
+      final sessionsData = (results[2].data as Map)['data'];
+      final progressData = (results[3].data as Map)['data'];
 
       if (!mounted) return;
 
@@ -87,6 +175,26 @@ class _ProfileScreenState extends State<ProfileScreen> {
         }
         if (statsData is Map) {
           _stats = Map<String, dynamic>.from(statsData);
+        }
+        if (sessionsData is List) {
+          _recentSessions = sessionsData
+              .whereType<Map>()
+              .map((item) => Map<String, dynamic>.from(item))
+              .toList();
+        }
+        if (progressData is Map) {
+          final badges = progressData['badges'];
+          final objectives = progressData['objectives'];
+          if (badges is List)
+            _badges = badges
+                .whereType<Map>()
+                .map((item) => Map<String, dynamic>.from(item))
+                .toList();
+          if (objectives is List)
+            _objectives = objectives
+                .whereType<Map>()
+                .map((item) => Map<String, dynamic>.from(item))
+                .toList();
         }
         _isLoading = false;
         _loadDataFuture = null;
@@ -134,11 +242,32 @@ class _ProfileScreenState extends State<ProfileScreen> {
     }
   }
 
+  Future<void> _copyInviteMessage() async {
+    try {
+      final token = await _storage.read(key: 'auth_token');
+      final response =
+          await ApiConfig.createDio(authToken: token).get('/friends/invite');
+      final data = (response.data as Map)['data'] as Map;
+      await Clipboard.setData(ClipboardData(text: data['message'].toString()));
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+            content: Text('Message d’invitation copié. Partage-le à un ami.')),
+      );
+    } catch (_) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Impossible de préparer l’invitation.')),
+      );
+    }
+  }
+
   String _getInitials(String name) {
     final trimmed = name.trim();
     if (trimmed.isEmpty) return 'J';
 
-    final parts = trimmed.split(RegExp(r'\s+')).where((p) => p.isNotEmpty).toList();
+    final parts =
+        trimmed.split(RegExp(r'\s+')).where((p) => p.isNotEmpty).toList();
     if (parts.length >= 2) {
       return '${parts[0][0]}${parts[1][0]}'.toUpperCase();
     }
@@ -176,9 +305,13 @@ class _ProfileScreenState extends State<ProfileScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
+              _accessibilitySettings(),
               _buildHeader(name, friendCode),
               const SizedBox(height: 24),
-              _buildStatsSection(gamesPlayed, bestScore, successRate, totalScore),
+              _buildStatsSection(
+                  gamesPlayed, bestScore, successRate, totalScore),
+              const SizedBox(height: 24),
+              _buildHistoryAndAchievements(),
               const SizedBox(height: 24),
               _buildCategoryProgress(categoryStats),
               const SizedBox(height: 24),
@@ -188,6 +321,81 @@ class _ProfileScreenState extends State<ProfileScreen> {
           ),
         ),
       ),
+    );
+  }
+
+  Widget _buildHistoryAndAchievements() {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 20),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Text('Badges et objectifs',
+            style: GoogleFonts.nunito(
+                fontSize: 18, fontWeight: FontWeight.w800, color: _textDark)),
+        const SizedBox(height: 10),
+        if (_badges.isEmpty)
+          const Text('Tes badges apparaîtront après tes premières parties.')
+        else
+          Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: _badges.map((badge) {
+                final unlocked = badge['unlocked'] == true;
+                final progress = (badge['progress'] ?? 0).toString();
+                final target = (badge['target'] ?? 1).toString();
+                return Chip(
+                  avatar: Icon(
+                      unlocked ? Icons.emoji_events : Icons.lock_outline,
+                      size: 18,
+                      color: unlocked ? _orange : _textGray),
+                  label: Text('${badge['name'] ?? 'Badge'} $progress/$target'),
+                  backgroundColor: unlocked ? const Color(0xFFFFF3E8) : _cardBg,
+                );
+              }).toList()),
+        if (_objectives.isNotEmpty) ...[
+          const SizedBox(height: 8),
+          ..._objectives.map((item) {
+            final progress = (item['progress'] as num?)?.toDouble() ?? 0;
+            final target =
+                ((item['target'] as num?)?.toDouble() ?? 1).clamp(1, 1000);
+            return ListTile(
+              contentPadding: EdgeInsets.zero,
+              dense: true,
+              title: Text(item['name']?.toString() ?? 'Objectif'),
+              subtitle: LinearProgressIndicator(
+                  value: (progress / target).clamp(0, 1),
+                  color: _orange,
+                  backgroundColor: _neutral),
+              trailing: Text('${progress.toInt()}/${target.toInt()}'),
+            );
+          }),
+        ],
+        const SizedBox(height: 18),
+        Text('Historique récent',
+            style: GoogleFonts.nunito(
+                fontSize: 18, fontWeight: FontWeight.w800, color: _textDark)),
+        if (_recentSessions.isEmpty)
+          const Padding(
+              padding: EdgeInsets.only(top: 8),
+              child: Text('Aucune partie enregistrée.'))
+        else
+          ..._recentSessions.take(5).map((session) => ListTile(
+                contentPadding: EdgeInsets.zero,
+                leading: const CircleAvatar(
+                    backgroundColor: Color(0xFFFFF3E8),
+                    child: Icon(Icons.quiz_outlined, color: _orange)),
+                title: Text((session['category'] is Map
+                            ? session['category']['name']
+                            : null)
+                        ?.toString() ??
+                    (session['mode'] == 'daily_challenge'
+                        ? 'Questions du jour'
+                        : 'Quiz mixte')),
+                subtitle: Text(
+                    '${session['correct_answers'] ?? 0}/${session['total_questions'] ?? 10} bonnes réponses'),
+                trailing: Text(
+                    '${session['total_score'] ?? session['points_earned'] ?? 0} pts'),
+              )),
+      ]),
     );
   }
 
@@ -283,6 +491,13 @@ class _ProfileScreenState extends State<ProfileScreen> {
               ),
             ),
           ),
+          TextButton.icon(
+            onPressed: _copyInviteMessage,
+            icon: const Icon(Icons.person_add_alt_1,
+                color: Colors.white, size: 18),
+            label: const Text('Copier mon invitation',
+                style: TextStyle(color: Colors.white)),
+          ),
         ],
       ),
     ).animate().fadeIn(duration: 500.ms).slideY(begin: -0.1);
@@ -349,7 +564,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
           ),
         ],
       ),
-    ).animate().fadeIn(duration: 400.ms, delay: 200.ms).slideY(begin: 0.1, delay: 200.ms);
+    )
+        .animate()
+        .fadeIn(duration: 400.ms, delay: 200.ms)
+        .slideY(begin: 0.1, delay: 200.ms);
   }
 
   Widget _buildStatCard({
@@ -412,10 +630,13 @@ class _ProfileScreenState extends State<ProfileScreen> {
           ...categoryStats.asMap().entries.map((entry) {
             final i = entry.key;
             final stat = entry.value as Map<String, dynamic>;
-            final categoryName = (stat['category_name'] ?? stat['name'] ?? '').toString();
-            final rawRate = (stat['success_rate'] ?? stat['rate'] ?? 0.0) as num;
+            final categoryName =
+                (stat['category_name'] ?? stat['name'] ?? '').toString();
+            final rawRate =
+                (stat['success_rate'] ?? stat['rate'] ?? 0.0) as num;
             final rate = rawRate.toDouble();
-            final normalizedRate = (rate > 1 ? rate / 100 : rate).clamp(0.0, 1.0);
+            final normalizedRate =
+                (rate > 1 ? rate / 100 : rate).clamp(0.0, 1.0);
             final percent = (normalizedRate * 100).toStringAsFixed(0);
 
             return Padding(
@@ -457,7 +678,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 ],
               )
                   .animate()
-                  .fadeIn(duration: 400.ms, delay: Duration(milliseconds: 100 * i))
+                  .fadeIn(
+                      duration: 400.ms, delay: Duration(milliseconds: 100 * i))
                   .slideX(begin: 0.1, delay: Duration(milliseconds: 100 * i)),
             );
           }).toList(),
@@ -476,7 +698,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
           onPressed: _isLoggingOut ? null : _logout,
           style: OutlinedButton.styleFrom(
             side: const BorderSide(color: _incorrect, width: 1.5),
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+            shape:
+                RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
           ),
           child: _isLoggingOut
               ? const SizedBox(
@@ -490,7 +713,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
               : Row(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    const Icon(Icons.logout_rounded, color: _incorrect, size: 20),
+                    const Icon(Icons.logout_rounded,
+                        color: _incorrect, size: 20),
                     const SizedBox(width: 8),
                     Text(
                       'Se déconnecter',

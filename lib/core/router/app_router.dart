@@ -21,15 +21,18 @@ final Provider<GoRouter> routerProvider = Provider<GoRouter>((Ref ref) {
     routes: <RouteBase>[
       GoRoute(
         path: '/splash',
-        builder: (BuildContext context, GoRouterState state) => const SplashScreen(),
+        builder: (BuildContext context, GoRouterState state) =>
+            const SplashScreen(),
       ),
       GoRoute(
         path: '/onboarding',
-        builder: (BuildContext context, GoRouterState state) => const OnboardingScreen(),
+        builder: (BuildContext context, GoRouterState state) =>
+            const OnboardingScreen(),
       ),
       GoRoute(
         path: '/auth',
-        builder: (BuildContext context, GoRouterState state) => const AuthScreen(),
+        builder: (BuildContext context, GoRouterState state) =>
+            AuthScreen(showLogin: true),
       ),
       StatefulShellRoute.indexedStack(
         builder: (
@@ -44,7 +47,8 @@ final Provider<GoRouter> routerProvider = Provider<GoRouter>((Ref ref) {
             routes: <RouteBase>[
               GoRoute(
                 path: '/home',
-                builder: (BuildContext context, GoRouterState state) => const HomeScreen(),
+                builder: (BuildContext context, GoRouterState state) =>
+                    const HomeScreen(),
                 routes: <RouteBase>[
                   GoRoute(
                     path: 'categories',
@@ -58,7 +62,8 @@ final Provider<GoRouter> routerProvider = Provider<GoRouter>((Ref ref) {
                         categories = rawCategories is List
                             ? rawCategories
                                 .whereType<Map>()
-                                .map((dynamic e) => Map<String, dynamic>.from(e as Map))
+                                .map((dynamic e) =>
+                                    Map<String, dynamic>.from(e as Map))
                                 .toList()
                             : <Map<String, dynamic>>[];
                         final dynamic rawMode = extra['selected_mode'];
@@ -82,7 +87,8 @@ final Provider<GoRouter> routerProvider = Provider<GoRouter>((Ref ref) {
             routes: <RouteBase>[
               GoRoute(
                 path: '/leaderboard',
-                builder: (BuildContext context, GoRouterState state) => const LeaderboardScreen(),
+                builder: (BuildContext context, GoRouterState state) =>
+                    const LeaderboardScreen(),
               ),
             ],
           ),
@@ -90,7 +96,8 @@ final Provider<GoRouter> routerProvider = Provider<GoRouter>((Ref ref) {
             routes: <RouteBase>[
               GoRoute(
                 path: '/friends',
-                builder: (BuildContext context, GoRouterState state) => const FriendsScreen(),
+                builder: (BuildContext context, GoRouterState state) =>
+                    const FriendsScreen(),
               ),
             ],
           ),
@@ -98,21 +105,35 @@ final Provider<GoRouter> routerProvider = Provider<GoRouter>((Ref ref) {
             routes: <RouteBase>[
               GoRoute(
                 path: '/profile',
-                builder: (BuildContext context, GoRouterState state) => const ProfileScreen(),
+                builder: (BuildContext context, GoRouterState state) =>
+                    const ProfileScreen(),
               ),
             ],
           ),
         ],
       ),
       GoRoute(
+        path: '/challenge/:code',
+        builder: (BuildContext context, GoRouterState state) => QuizScreen(
+          mode: 'challenge',
+          challengeCode: state.pathParameters['code'],
+        ),
+      ),
+      GoRoute(
         path: '/quiz/:categoryId/:mode',
         builder: (BuildContext context, GoRouterState state) {
           final String? categoryIdParam = state.pathParameters['categoryId'];
-          final int? categoryId = categoryIdParam == 'null' || categoryIdParam == null
-              ? null
-              : int.tryParse(categoryIdParam);
+          final int? categoryId =
+              categoryIdParam == 'null' || categoryIdParam == null
+                  ? null
+                  : int.tryParse(categoryIdParam);
           final String mode = state.pathParameters['mode'] ?? '';
-          return QuizScreen(categoryId: categoryId, mode: mode);
+          final dynamic extra = state.extra;
+          return QuizScreen(
+            categoryId: categoryId,
+            mode: mode,
+            resumeData: extra is Map ? Map<String, dynamic>.from(extra) : null,
+          );
         },
       ),
       GoRoute(

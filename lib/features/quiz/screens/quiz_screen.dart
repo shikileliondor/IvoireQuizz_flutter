@@ -10,30 +10,33 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../../core/config/api_config.dart';
 
-const _orange    = Color(0xFFF77F00);
-const _textDark  = Color(0xFF1A1A2E);
-const _textGray  = Color(0xFF6B7280);
-const _cardBg    = Color(0xFFF8F9FA);
-const _neutral   = Color(0xFFE5E7EB);
-const _correct   = Color(0xFF22C55E);
+const _orange = Color(0xFFF77F00);
+const _textDark = Color(0xFF1A1A2E);
+const _textGray = Color(0xFF6B7280);
+const _cardBg = Color(0xFFF8F9FA);
+const _neutral = Color(0xFFE5E7EB);
+const _correct = Color(0xFF22C55E);
 const _incorrect = Color(0xFFEF4444);
 
 class QuizScreen extends StatefulWidget {
   final int? categoryId;
   final String mode;
+  final String? challengeCode;
+  final Map<String, dynamic>? resumeData;
   const QuizScreen({
     super.key,
     this.categoryId,
+    this.challengeCode,
+    this.resumeData,
     required this.mode,
   });
 
   @override
-  State<QuizScreen> createState() =>
-    _QuizScreenState();
+  State<QuizScreen> createState() => _QuizScreenState();
 }
 
 class _QuizScreenState extends State<QuizScreen> {
-  List<Map<String,dynamic>> _questions = [];
+  List<Map<String, dynamic>> _questions = [];
   int _currentIndex = 0;
   int? _selectedOptionId;
   bool _answered = false;
@@ -42,16 +45,75 @@ class _QuizScreenState extends State<QuizScreen> {
   bool _isLoading = false;
   bool _isSubmitting = false;
   int _timeLeft = 20;
+  int _questionDuration = 20;
+  bool _offlineGame = false;
   int _sessionStartTime = 0;
   Timer? _timer;
-  List<Map<String,dynamic>> _answers = [];
+  List<Map<String, dynamic>> _answers = [];
   static const _storage = FlutterSecureStorage();
 
   @override
   void initState() {
     super.initState();
-    _sessionStartTime = DateTime.now()
-      .millisecondsSinceEpoch;
+    _sessionStartTime = DateTime.now().millisecondsSinceEpoch;
+    final saved = widget.resumeData;
+    if (saved != null && saved['questions'] is List) {
+      _questions = (saved['questions'] as List)
+          .asMap()
+          .entries
+          .map((entry) => _normalizeQuestion(entry.value, entry.key))
+          .whereType<Map<String, dynamic>>()
+          .toList();
+      _answers = (saved['answers'] as List? ?? const [])
+          .whereType<Map>()
+          .map((answer) => Map<String, dynamic>.from(answer))
+          .toList();
+      _currentIndex = ((_asInt(saved['current_index']) ?? 0)
+          .clamp(0, _questions.isEmpty ? 0 : _questions.length - 1));
+      _sessionStartTime = _asInt(saved['started_at']) ?? _sessionStartTime;
+      _hasStarted = _questions.isNotEmpty;
+      final currentId =
+          _questions.isEmpty ? null : _questions[_currentIndex]['id'];
+      final last = _answers.isEmpty ? null : _answers.last;
+      if (last != null && last['question_id'] == currentId) {
+        _selectedOptionId = _asInt(last['selected_option_id']);
+        _answered = true;
+        final option = _optionsOf(_questions[_currentIndex]).firstWhere(
+          (item) => item['id'] == _selectedOptionId,
+          orElse: () => <String, dynamic>{},
+        );
+        _isCorrectAnswer = option['is_correct'] == true;
+      }
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted || !_hasStarted) return;
+        if (_answered) {
+          Future.delayed(const Duration(seconds: 2), () {
+            if (mounted) _nextQuestion();
+          });
+        } else {
+          _startTimer();
+        }
+      });
+    }
+  }
+
+  int? _asInt(dynamic value) =>
+      value is int ? value : int.tryParse(value?.toString() ?? '');
+
+  Future<void> _persistDraft() async {
+    if (widget.challengeCode != null || _offlineGame || _questions.isEmpty)
+      return;
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(
+        'active_quiz_draft',
+        jsonEncode({
+          'category_id': widget.categoryId,
+          'mode': widget.mode,
+          'questions': _questions,
+          'answers': _answers,
+          'current_index': _currentIndex,
+          'started_at': _sessionStartTime,
+        }));
   }
 
   @override
@@ -72,8 +134,7 @@ class _QuizScreenState extends State<QuizScreen> {
 
   Future<void> _loadQuestions() async {
     try {
-      final token = await _storage
-        .read(key: 'auth_token');
+      final token = await _storage.read(key: 'auth_token');
 
       debugPrint('=== QUIZ DEBUG ===');
       debugPrint('TOKEN: $token');
@@ -87,12 +148,32 @@ class _QuizScreenState extends State<QuizScreen> {
 
       final dio = ApiConfig.createDio(authToken: token);
 
-      final Map<String,dynamic> params = {
+      if (widget.challengeCode != null) {
+        final challengeResponse =
+            await dio.get('/challenges/${widget.challengeCode}');
+        final challengeList = _extractQuestionsPayload(challengeResponse.data);
+        final challengeQuestions = challengeList
+            .asMap()
+            .entries
+            .map((entry) => _normalizeQuestion(entry.value, entry.key))
+            .whereType<Map<String, dynamic>>()
+            .toList();
+        if (challengeQuestions.isEmpty)
+          throw StateError('Le défi ne contient pas de questions.');
+        if (!mounted) return;
+        setState(() {
+          _questions = challengeQuestions;
+          _isLoading = false;
+        });
+        _startTimer();
+        return;
+      }
+
+      final Map<String, dynamic> params = {
         'mode': widget.mode,
       };
       if (widget.categoryId != null) {
-        params['category_id'] =
-          widget.categoryId.toString();
+        params['category_id'] = widget.categoryId.toString();
       }
 
       debugPrint('PARAMS: $params');
@@ -108,11 +189,24 @@ class _QuizScreenState extends State<QuizScreen> {
 
       final list = _extractQuestionsPayload(response.data);
       final questions = list
-        .asMap()
-        .entries
-        .map((entry) => _normalizeQuestion(entry.value, entry.key))
-        .whereType<Map<String,dynamic>>()
-        .toList();
+          .asMap()
+          .entries
+          .map((entry) => _normalizeQuestion(entry.value, entry.key))
+          .whereType<Map<String, dynamic>>()
+          .toList();
+
+      if (questions.isNotEmpty) {
+        final prefs = await SharedPreferences.getInstance();
+        final safeQuestions = questions.map((question) {
+          final copy = Map<String, dynamic>.from(question);
+          copy['options'] = _optionsOf(copy)
+              .map((option) => Map<String, dynamic>.from(option))
+              .toList();
+          return copy;
+        }).toList();
+        await prefs.setString('quiz_cache_${widget.categoryId}_${widget.mode}',
+            jsonEncode(safeQuestions));
+      }
 
       debugPrint('QUESTIONS PAYLOAD TYPE: ${list.runtimeType}');
       debugPrint('QUESTIONS: ${questions.length}');
@@ -122,25 +216,61 @@ class _QuizScreenState extends State<QuizScreen> {
           _questions = questions;
           _isLoading = false;
         });
+        await _persistDraft();
         _startTimer();
       } else {
         debugPrint('Aucune question exploitable dans la réponse API.');
-        setState(() => _isLoading = false);
+        await _loadOfflineQuestions();
       }
     } on DioException catch (e) {
       debugPrint('DIO ERROR: ${e.message}');
       debugPrint('STATUS: ${e.response?.statusCode}');
       debugPrint('DATA: ${e.response?.data}');
       if (e.response?.statusCode == 401) {
-        await _storage.delete(key: 'auth_token');
-        if (mounted) context.go('/auth');
+        await _loadOfflineQuestions();
+        if (!_offlineGame) {
+          await _storage.delete(key: 'auth_token');
+          if (mounted) context.go('/auth');
+        }
         return;
       }
-      setState(() => _isLoading = false);
+      await _loadOfflineQuestions();
     } catch (e) {
       debugPrint('ERROR: $e');
-      setState(() => _isLoading = false);
+      await _loadOfflineQuestions();
     }
+  }
+
+  Future<void> _loadOfflineQuestions() async {
+    final prefs = await SharedPreferences.getInstance();
+    final cached =
+        prefs.getString('quiz_cache_${widget.categoryId}_${widget.mode}');
+    if (cached == null) {
+      if (mounted) setState(() => _isLoading = false);
+      return;
+    }
+    final decoded = jsonDecode(cached);
+    if (decoded is! List) {
+      if (mounted) setState(() => _isLoading = false);
+      return;
+    }
+    final questions = decoded
+        .asMap()
+        .entries
+        .map((entry) => _normalizeQuestion(entry.value, entry.key))
+        .whereType<Map<String, dynamic>>()
+        .toList();
+    if (!mounted) return;
+    if (questions.isEmpty) {
+      setState(() => _isLoading = false);
+      return;
+    }
+    setState(() {
+      _questions = questions;
+      _offlineGame = true;
+      _isLoading = false;
+    });
+    _startTimer();
   }
 
   dynamic _decodeIfJsonString(dynamic payload) {
@@ -181,7 +311,7 @@ class _QuizScreenState extends State<QuizScreen> {
     return const [];
   }
 
-  Map<String,dynamic>? _normalizeQuestion(dynamic json, int index) {
+  Map<String, dynamic>? _normalizeQuestion(dynamic json, int index) {
     if (json is! Map) {
       debugPrint(
         'QUESTION[$index] ignorée: type ${json.runtimeType} non supporté',
@@ -208,18 +338,18 @@ class _QuizScreenState extends State<QuizScreen> {
     return question;
   }
 
-  List<Map<String,dynamic>> _normalizeOptions(dynamic json) {
-    if (json is! List) return <Map<String,dynamic>>[];
+  List<Map<String, dynamic>> _normalizeOptions(dynamic json) {
+    if (json is! List) return <Map<String, dynamic>>[];
     return json
-      .asMap()
-      .entries
-      .map((entry) => _normalizeOption(entry.value, entry.key))
-      .toList();
+        .asMap()
+        .entries
+        .map((entry) => _normalizeOption(entry.value, entry.key))
+        .toList();
   }
 
-  Map<String,dynamic> _normalizeOption(dynamic json, int index) {
+  Map<String, dynamic> _normalizeOption(dynamic json, int index) {
     if (json is String) {
-      return <String,dynamic>{
+      return <String, dynamic>{
         'id': index + 1,
         'option_text': json,
         'text': json,
@@ -246,7 +376,7 @@ class _QuizScreenState extends State<QuizScreen> {
       'OPTION[$index] remplacée par une option vide: '
       'type ${json.runtimeType} non supporté',
     );
-    return <String,dynamic>{
+    return <String, dynamic>{
       'id': index + 1,
       'option_text': '',
       'text': '',
@@ -255,20 +385,20 @@ class _QuizScreenState extends State<QuizScreen> {
     };
   }
 
-  List<Map<String,dynamic>> _optionsOf(Map<String,dynamic> question) {
+  List<Map<String, dynamic>> _optionsOf(Map<String, dynamic> question) {
     final options = question['options'];
-    if (options is List<Map<String,dynamic>>) return options;
+    if (options is List<Map<String, dynamic>>) return options;
     if (options is List) return _normalizeOptions(options);
-    return <Map<String,dynamic>>[];
+    return <Map<String, dynamic>>[];
   }
 
-  Map<String,dynamic> _stringKeyMap(Map<dynamic,dynamic> json) {
+  Map<String, dynamic> _stringKeyMap(Map<dynamic, dynamic> json) {
     return json.map(
       (key, value) => MapEntry(key.toString(), value),
     );
   }
 
-  String _firstText(Map<String,dynamic> json, List<String> keys) {
+  String _firstText(Map<String, dynamic> json, List<String> keys) {
     for (final key in keys) {
       final value = json[key];
       if (value != null) return value.toString();
@@ -276,7 +406,7 @@ class _QuizScreenState extends State<QuizScreen> {
     return '';
   }
 
-  String _optionText(Map<String,dynamic> option) {
+  String _optionText(Map<String, dynamic> option) {
     return _firstText(option, const ['option_text', 'text', 'label']);
   }
 
@@ -295,10 +425,12 @@ class _QuizScreenState extends State<QuizScreen> {
 
   void _startTimer() {
     _timer?.cancel();
-    _timeLeft = 20;
-    _timer = Timer.periodic(
-      const Duration(seconds: 1), (timer) {
-      if (!mounted) { timer.cancel(); return; }
+    _timeLeft = _questionDuration;
+    _timer = Timer.periodic(const Duration(seconds: 1), (timer) {
+      if (!mounted) {
+        timer.cancel();
+        return;
+      }
       if (_timeLeft <= 0) {
         timer.cancel();
         _onOptionSelected(null);
@@ -313,7 +445,7 @@ class _QuizScreenState extends State<QuizScreen> {
   void _onOptionSelected(int? optionId) {
     if (_answered) return;
     _stopTimer();
-    final responseTime = 20 - _timeLeft;
+    final responseTime = _questionDuration - _timeLeft;
     final question = _questions[_currentIndex];
     bool isCorrect = false;
     if (optionId != null) {
@@ -334,6 +466,7 @@ class _QuizScreenState extends State<QuizScreen> {
       'selected_option_id': optionId,
       'response_time_seconds': responseTime,
     });
+    _persistDraft();
     Future.delayed(const Duration(seconds: 2), () {
       if (!mounted) return;
       _nextQuestion();
@@ -347,8 +480,9 @@ class _QuizScreenState extends State<QuizScreen> {
         _selectedOptionId = null;
         _answered = false;
         _isCorrectAnswer = false;
-        _timeLeft = 20;
+        _timeLeft = _questionDuration;
       });
+      _persistDraft();
       _startTimer();
     } else {
       _submitSession();
@@ -357,13 +491,70 @@ class _QuizScreenState extends State<QuizScreen> {
 
   Future<void> _submitSession() async {
     setState(() => _isSubmitting = true);
+    if (widget.challengeCode != null) {
+      try {
+        final token = await _storage.read(key: 'auth_token');
+        final dio = ApiConfig.createDio(authToken: token);
+        final response =
+            await dio.post('/challenges/${widget.challengeCode}/submit', data: {
+          'answers': _answers
+              .map((answer) => {
+                    'question_id': answer['question_id'],
+                    'answer_id': answer['selected_option_id'],
+                    'response_time': answer['response_time_seconds'],
+                  })
+              .toList(),
+        });
+        final payload = response.data is Map ? response.data['data'] : null;
+        if (payload is Map && mounted) {
+          context.go('/result', extra: {
+            'correct_answers': payload['your_correct'] ?? 0,
+            'total_questions': _questions.length,
+            'total_score': payload['your_score'] ?? 0,
+            'challenge_code': widget.challengeCode,
+            'challenge_status': payload['status'],
+            'challenger_score': payload['challenger_score'],
+            'opponent_score': payload['opponent_score'],
+            'winner_id': payload['winner_id'],
+          });
+        }
+      } catch (e) {
+        debugPrint('CHALLENGE SUBMIT ERROR: $e');
+        if (mounted) setState(() => _isSubmitting = false);
+      }
+      return;
+    }
+    if (_offlineGame) {
+      final correct = _answers.where((answer) {
+        final question =
+            _questions.firstWhere((q) => q['id'] == answer['question_id']);
+        final selected = _optionsOf(question)
+            .where((o) => o['id'] == answer['selected_option_id']);
+        return selected.isNotEmpty && selected.first['is_correct'] == true;
+      }).length;
+      final result = <String, dynamic>{
+        'correct_answers': correct,
+        'total_questions': _questions.length,
+        'total_score': correct * 100,
+        'duration_seconds':
+            ((DateTime.now().millisecondsSinceEpoch - _sessionStartTime) / 1000)
+                .round(),
+        'offline': true
+      };
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.remove('active_quiz_draft');
+      final history = prefs.getStringList('offline_results') ?? <String>[];
+      history.add(jsonEncode(result));
+      await prefs.setStringList('offline_results', history);
+      if (mounted) context.go('/result', extra: result);
+      return;
+    }
     try {
-      final token = await _storage
-        .read(key: 'auth_token');
+      final token = await _storage.read(key: 'auth_token');
       final dio = ApiConfig.createDio(authToken: token);
       final durationSeconds =
-        ((DateTime.now().millisecondsSinceEpoch -
-          _sessionStartTime) / 1000).round();
+          ((DateTime.now().millisecondsSinceEpoch - _sessionStartTime) / 1000)
+              .round();
       final response = await dio.post(
         '/sessions',
         data: {
@@ -376,13 +567,12 @@ class _QuizScreenState extends State<QuizScreen> {
       debugPrint('SESSION: ${response.data}');
       final sessionData = _decodeIfJsonString(response.data);
       if (sessionData is Map && sessionData['success'] == true) {
-        final prefs = await SharedPreferences
-          .getInstance();
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.remove('active_quiz_draft');
         await prefs.remove('home_cache');
         debugPrint('Cache Home invalidé');
         if (mounted) {
-          context.go('/result',
-            extra: sessionData['data']);
+          context.go('/result', extra: sessionData['data']);
         }
       }
     } catch (e) {
@@ -393,6 +583,7 @@ class _QuizScreenState extends State<QuizScreen> {
 
   Widget _buildStartScreen() {
     final bool isMixed = widget.mode == 'mixed';
+    final bool isDaily = widget.mode == 'daily';
     return Scaffold(
       backgroundColor: Colors.white,
       body: SafeArea(
@@ -412,11 +603,24 @@ class _QuizScreenState extends State<QuizScreen> {
                       borderRadius: BorderRadius.circular(12),
                       border: Border.all(color: _neutral),
                     ),
-                    child: const Icon(Icons.arrow_back_rounded, color: _textGray),
+                    child:
+                        const Icon(Icons.arrow_back_rounded, color: _textGray),
                   ),
                 ),
               ),
               const Spacer(),
+              Row(mainAxisAlignment: MainAxisAlignment.center, children: [
+                const Text('Temps par question : '),
+                DropdownButton<int>(
+                    value: _questionDuration,
+                    items: const [10, 15, 20, 30]
+                        .map((v) =>
+                            DropdownMenuItem(value: v, child: Text('$v s')))
+                        .toList(),
+                    onChanged: (v) {
+                      if (v != null) setState(() => _questionDuration = v);
+                    }),
+              ]),
               Container(
                 width: 96,
                 height: 96,
@@ -425,14 +629,22 @@ class _QuizScreenState extends State<QuizScreen> {
                   shape: BoxShape.circle,
                 ),
                 child: Icon(
-                  isMixed ? Icons.shuffle_rounded : Icons.play_arrow_rounded,
+                  isMixed
+                      ? Icons.shuffle_rounded
+                      : isDaily
+                          ? Icons.today_rounded
+                          : Icons.play_arrow_rounded,
                   color: _orange,
                   size: 44,
                 ),
               ),
               const SizedBox(height: 24),
               Text(
-                isMixed ? 'Mode mixte' : 'Quiz par catégorie',
+                isMixed
+                    ? 'Mode mixte'
+                    : isDaily
+                        ? 'Questions du jour'
+                        : 'Quiz par catégorie',
                 textAlign: TextAlign.center,
                 style: GoogleFonts.nunito(
                   fontSize: 26,
@@ -442,7 +654,9 @@ class _QuizScreenState extends State<QuizScreen> {
               ),
               const SizedBox(height: 12),
               Text(
-                'Les questions seront téléchargées uniquement quand vous démarrez la partie.',
+                isDaily
+                    ? 'Une série commune à tous les joueurs, renouvelée chaque jour.'
+                    : 'Les questions seront téléchargées uniquement quand vous démarrez la partie.',
                 textAlign: TextAlign.center,
                 style: GoogleFonts.nunito(
                   fontSize: 15,
@@ -456,7 +670,8 @@ class _QuizScreenState extends State<QuizScreen> {
                 height: 56,
                 child: ElevatedButton.icon(
                   onPressed: _startQuiz,
-                  icon: const Icon(Icons.play_arrow_rounded, color: Colors.white),
+                  icon:
+                      const Icon(Icons.play_arrow_rounded, color: Colors.white),
                   label: Text(
                     'Lancer la partie',
                     style: GoogleFonts.nunito(
@@ -536,37 +751,35 @@ class _QuizScreenState extends State<QuizScreen> {
         label = 'Question';
     }
     return Container(
-      padding: const EdgeInsets.symmetric(
-        horizontal: 10, vertical: 4),
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
       decoration: BoxDecoration(
         color: bgColor,
         borderRadius: const BorderRadius.all(Radius.circular(20)),
       ),
       child: Text(label,
-        style: GoogleFonts.nunito(
-          fontSize: 11,
-          fontWeight: FontWeight.w600,
-          color: textColor,
-        )),
+          style: GoogleFonts.nunito(
+            fontSize: 11,
+            fontWeight: FontWeight.w600,
+            color: textColor,
+          )),
     );
   }
 
   Widget _buildTopBar() {
     return Padding(
-      padding: const EdgeInsets.symmetric(
-        horizontal: 20, vertical: 12),
+      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
       child: Row(children: [
         GestureDetector(
           onTap: () => context.pop(),
           child: Container(
-            width: 36, height: 36,
+            width: 36,
+            height: 36,
             decoration: BoxDecoration(
               color: _cardBg,
               borderRadius: const BorderRadius.all(Radius.circular(10)),
               border: Border.all(color: _neutral),
             ),
-            child: const Icon(Icons.close_rounded,
-              color: _textGray, size: 20),
+            child: const Icon(Icons.close_rounded, color: _textGray, size: 20),
           ),
         ),
         const SizedBox(width: 12),
@@ -574,12 +787,11 @@ class _QuizScreenState extends State<QuizScreen> {
           child: ClipRRect(
             borderRadius: const BorderRadius.all(Radius.circular(4)),
             child: LinearProgressIndicator(
-              value: _questions.isEmpty ? 0 :
-                (_currentIndex + 1) /
-                _questions.length,
+              value: _questions.isEmpty
+                  ? 0
+                  : (_currentIndex + 1) / _questions.length,
               backgroundColor: _neutral,
-              valueColor: const AlwaysStoppedAnimation(
-                _orange),
+              valueColor: const AlwaysStoppedAnimation(_orange),
               minHeight: 8,
             ),
           ),
@@ -587,29 +799,22 @@ class _QuizScreenState extends State<QuizScreen> {
         const SizedBox(width: 12),
         AnimatedContainer(
           duration: const Duration(milliseconds: 300),
-          padding: const EdgeInsets.symmetric(
-            horizontal: 12, vertical: 6),
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
           decoration: BoxDecoration(
-            color: _timeLeft <= 5
-              ? const Color(0xFFFFEBEB) : _cardBg,
+            color: _timeLeft <= 5 ? const Color(0xFFFFEBEB) : _cardBg,
             borderRadius: const BorderRadius.all(Radius.circular(20)),
-            border: Border.all(
-              color: _timeLeft <= 5
-                ? _incorrect : _neutral),
+            border: Border.all(color: _timeLeft <= 5 ? _incorrect : _neutral),
           ),
           child: Row(children: [
             Icon(Icons.timer_outlined,
-              color: _timeLeft <= 5
-                ? _incorrect : _textGray,
-              size: 16),
+                color: _timeLeft <= 5 ? _incorrect : _textGray, size: 16),
             const SizedBox(width: 4),
             Text('$_timeLeft s',
-              style: GoogleFonts.nunito(
-                fontSize: 14,
-                fontWeight: FontWeight.w700,
-                color: _timeLeft <= 5
-                  ? _incorrect : _textDark,
-              )),
+                style: GoogleFonts.nunito(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w700,
+                  color: _timeLeft <= 5 ? _incorrect : _textDark,
+                )),
           ]),
         ),
       ]),
@@ -629,7 +834,8 @@ class _QuizScreenState extends State<QuizScreen> {
 
   Widget _buildQuestionCard() {
     final question = _questions[_currentIndex];
-    final questionText = '${question['question_text'] ?? question['question'] ?? question['text'] ?? ''}';
+    final questionText =
+        '${question['question_text'] ?? question['question'] ?? question['text'] ?? ''}';
 
     return LayoutBuilder(
       builder: (context, constraints) {
@@ -734,9 +940,8 @@ class _QuizScreenState extends State<QuizScreen> {
     final correctText = _optionText(correctOption);
     final explanation = '${question['explanation'] ?? ''}';
     final statusColor = _isCorrectAnswer ? _correct : _incorrect;
-    final backgroundColor = _isCorrectAnswer
-      ? const Color(0xFFE8F5E9)
-      : const Color(0xFFFFF7ED);
+    final backgroundColor =
+        _isCorrectAnswer ? const Color(0xFFE8F5E9) : const Color(0xFFFFF7ED);
 
     return Container(
       width: double.infinity,
@@ -755,8 +960,8 @@ class _QuizScreenState extends State<QuizScreen> {
             children: [
               Icon(
                 _isCorrectAnswer
-                  ? Icons.check_circle_outline
-                  : Icons.cancel_outlined,
+                    ? Icons.check_circle_outline
+                    : Icons.cancel_outlined,
                 color: statusColor,
                 size: 20,
               ),
@@ -764,8 +969,8 @@ class _QuizScreenState extends State<QuizScreen> {
               Expanded(
                 child: Text(
                   _isCorrectAnswer
-                    ? 'Bonne réponse ! +points'
-                    : 'Mauvaise réponse',
+                      ? 'Bonne réponse ! +points'
+                      : 'Mauvaise réponse',
                   softWrap: true,
                   style: GoogleFonts.nunito(
                     fontSize: 14,
@@ -826,9 +1031,7 @@ class _QuizScreenState extends State<QuizScreen> {
           ],
         ],
       ),
-    ).animate()
-      .fadeIn(duration: 300.ms)
-      .slideY(begin: 0.12);
+    ).animate().fadeIn(duration: 300.ms).slideY(begin: 0.12);
   }
 
   Widget _buildOptions() {
@@ -839,17 +1042,11 @@ class _QuizScreenState extends State<QuizScreen> {
       children: List.generate(options.length, (i) {
         final option = options[i];
         final optionId = _parseInt(option['id']) ?? i + 1;
-        final isSelected =
-          _selectedOptionId == optionId;
-        final isCorrectOption =
-          option['is_correct'] == true;
-        final isWrongSelected =
-          isSelected && !isCorrectOption;
-        final isRightOption =
-          isCorrectOption && _answered;
-        final isNotSelected =
-          _answered && !isSelected &&
-          !isRightOption;
+        final isSelected = _selectedOptionId == optionId;
+        final isCorrectOption = option['is_correct'] == true;
+        final isWrongSelected = isSelected && !isCorrectOption;
+        final isRightOption = isCorrectOption && _answered;
+        final isNotSelected = _answered && !isSelected && !isRightOption;
 
         Color bgColor;
         Color borderColor;
@@ -886,19 +1083,17 @@ class _QuizScreenState extends State<QuizScreen> {
             trailingIcon = null;
           }
         } else {
-          bgColor = isSelected
-            ? const Color(0xFFFFF3E8)
-            : Colors.white;
+          bgColor = isSelected ? const Color(0xFFFFF3E8) : Colors.white;
           borderColor = isSelected ? _orange : _neutral;
           circleColor = isSelected ? _orange : _cardBg;
           letterColor = isSelected ? Colors.white : _textGray;
           trailingIcon = isSelected
-            ? const Icon(
-                Icons.radio_button_checked,
-                color: _orange,
-                size: 20,
-              )
-            : null;
+              ? const Icon(
+                  Icons.radio_button_checked,
+                  color: _orange,
+                  size: 20,
+                )
+              : null;
         }
 
         return Padding(
@@ -906,16 +1101,12 @@ class _QuizScreenState extends State<QuizScreen> {
             bottom: i == options.length - 1 ? 0 : 12,
           ),
           child: GestureDetector(
-            onTap: _answered
-              ? null
-              : () => _onOptionSelected(optionId),
+            onTap: _answered ? null : () => _onOptionSelected(optionId),
             child: AnimatedOpacity(
-              duration:
-                const Duration(milliseconds: 300),
+              duration: const Duration(milliseconds: 300),
               opacity: isNotSelected ? 0.4 : 1.0,
               child: AnimatedContainer(
-                duration:
-                  const Duration(milliseconds: 300),
+                duration: const Duration(milliseconds: 300),
                 width: double.infinity,
                 constraints: const BoxConstraints(minHeight: 64),
                 padding: const EdgeInsets.symmetric(
@@ -924,15 +1115,14 @@ class _QuizScreenState extends State<QuizScreen> {
                 ),
                 decoration: BoxDecoration(
                   color: bgColor,
-                  borderRadius:
-                    BorderRadius.circular(16),
+                  borderRadius: BorderRadius.circular(16),
                   border: Border.all(
                     color: borderColor,
                     width: (_answered && isRightOption) ||
-                        (_answered && isWrongSelected) ||
-                        (!_answered && isSelected)
-                      ? 2
-                      : 1,
+                            (_answered && isWrongSelected) ||
+                            (!_answered && isSelected)
+                        ? 2
+                        : 1,
                   ),
                   boxShadow: [
                     BoxShadow(
@@ -951,13 +1141,11 @@ class _QuizScreenState extends State<QuizScreen> {
                       decoration: BoxDecoration(
                         shape: BoxShape.circle,
                         color: circleColor,
-                        border: Border.all(
-                          color: borderColor),
+                        border: Border.all(color: borderColor),
                       ),
                       child: Center(
                         child: Text(
-                          i < letters.length
-                            ? letters[i] : '?',
+                          i < letters.length ? letters[i] : '?',
                           style: GoogleFonts.nunito(
                             fontSize: 13,
                             fontWeight: FontWeight.w800,
@@ -1045,17 +1233,17 @@ class _QuizScreenState extends State<QuizScreen> {
     if (_isSubmitting) {
       return Scaffold(
         backgroundColor: Colors.white,
-        body: Center(child: Column(
+        body: Center(
+            child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            const CircularProgressIndicator(
-              color: _orange),
+            const CircularProgressIndicator(color: _orange),
             const SizedBox(height: 16),
             Text('Calcul de votre score...',
-              style: GoogleFonts.nunito(
-                fontSize: 16,
-                fontWeight: FontWeight.w600,
-                color: _textGray)),
+                style: GoogleFonts.nunito(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w600,
+                    color: _textGray)),
           ],
         )),
       );
@@ -1063,28 +1251,25 @@ class _QuizScreenState extends State<QuizScreen> {
     if (_questions.isEmpty) {
       return Scaffold(
         backgroundColor: Colors.white,
-        body: Center(child: Column(
+        body: Center(
+            child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            const Icon(Icons.quiz_outlined,
-              size: 64, color: _neutral),
+            const Icon(Icons.quiz_outlined, size: 64, color: _neutral),
             const SizedBox(height: 16),
             Text('Aucune question disponible',
-              style: GoogleFonts.nunito(
-                fontSize: 16, color: _textGray)),
+                style: GoogleFonts.nunito(fontSize: 16, color: _textGray)),
             const SizedBox(height: 24),
             ElevatedButton(
               onPressed: () => context.pop(),
               style: ElevatedButton.styleFrom(
                 backgroundColor: _orange,
                 shape: RoundedRectangleBorder(
-                  borderRadius:
-                    BorderRadius.circular(14)),
+                    borderRadius: BorderRadius.circular(14)),
               ),
               child: Text('Retour',
-                style: GoogleFonts.nunito(
-                  color: Colors.white,
-                  fontWeight: FontWeight.w700)),
+                  style: GoogleFonts.nunito(
+                      color: Colors.white, fontWeight: FontWeight.w700)),
             ),
           ],
         )),
@@ -1101,7 +1286,6 @@ class _QuizScreenState extends State<QuizScreen> {
     );
   }
 }
-
 
 class _QuizSkeletonBox extends StatefulWidget {
   const _QuizSkeletonBox({

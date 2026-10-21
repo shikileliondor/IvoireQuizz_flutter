@@ -4,7 +4,7 @@ import 'package:google_fonts/google_fonts.dart';
 
 import '../../../core/theme/app_theme.dart';
 
-class AllCategoriesScreen extends StatelessWidget {
+class AllCategoriesScreen extends StatefulWidget {
   const AllCategoriesScreen({
     required this.categories,
     required this.selectedMode,
@@ -14,7 +14,22 @@ class AllCategoriesScreen extends StatelessWidget {
   final List<Map<String, dynamic>> categories;
   final String selectedMode;
 
-  ({Color bgColor, Color iconColor, IconData icon}) _getCategoryStyle(int index) {
+  @override
+  State<AllCategoriesScreen> createState() => _AllCategoriesScreenState();
+}
+
+class _AllCategoriesScreenState extends State<AllCategoriesScreen> {
+  final TextEditingController _searchController = TextEditingController();
+  bool _onlyPlayable = false;
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
+  }
+
+  ({Color bgColor, Color iconColor, IconData icon}) _getCategoryStyle(
+      int index) {
     switch (index % 3) {
       case 0:
         return (
@@ -40,6 +55,12 @@ class AllCategoriesScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final query = _searchController.text.trim().toLowerCase();
+    final filtered = widget.categories.where((category) {
+      final name = (category['name'] ?? '').toString().toLowerCase();
+      final count = (category['questions_count'] as num?)?.toInt() ?? 0;
+      return name.contains(query) && (!_onlyPlayable || count >= 10);
+    }).toList();
     return Scaffold(
       backgroundColor: Colors.white,
       appBar: AppBar(
@@ -60,7 +81,7 @@ class AllCategoriesScreen extends StatelessWidget {
           ),
         ),
       ),
-      body: categories.isEmpty
+      body: widget.categories.isEmpty
           ? Center(
               child: Text(
                 'Aucune catégorie disponible.',
@@ -71,83 +92,130 @@ class AllCategoriesScreen extends StatelessWidget {
                 ),
               ),
             )
-          : ListView.separated(
-              padding: const EdgeInsets.all(20),
-              itemCount: categories.length,
-              separatorBuilder: (_, __) => const SizedBox(height: 12),
-              itemBuilder: (BuildContext context, int index) {
-                final Map<String, dynamic> category = categories[index];
-                final ({Color bgColor, Color iconColor, IconData icon}) style = _getCategoryStyle(index);
-                final String categoryName = (category['name'] as String?)?.trim().isNotEmpty == true
-                    ? (category['name'] as String).trim()
-                    : 'Catégorie';
-                final int questionsCount = (category['questions_count'] as num?)?.toInt() ?? 0;
-
-                return GestureDetector(
-                  onTap: () {
-                    if (selectedMode == 'mixed') {
-                      context.push('/quiz/null/mixed');
-                      return;
-                    }
-                    context.push('/quiz/${category['id']}/$selectedMode');
-                  },
-                  child: Container(
-                    padding: const EdgeInsets.all(16),
-                    decoration: BoxDecoration(
-                      color: style.bgColor,
-                      borderRadius: const BorderRadius.all(Radius.circular(16)),
-                    ),
-                    child: Row(
-                      children: <Widget>[
-                        Container(
-                          width: 44,
-                          height: 44,
-                          decoration: BoxDecoration(
-                            color: Colors.white.withOpacity(0.6),
-                            borderRadius: const BorderRadius.all(Radius.circular(10)),
-                          ),
-                          child: Icon(
-                            style.icon,
-                            size: 24,
-                            color: style.iconColor,
-                          ),
-                        ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: <Widget>[
-                              Text(
-                                categoryName,
-                                style: GoogleFonts.nunito(
-                                  fontSize: 15,
-                                  fontWeight: FontWeight.w700,
-                                  color: AppColors.textDark,
-                                ),
-                              ),
-                              const SizedBox(height: 4),
-                              Text(
-                                '$questionsCount questions disponibles',
-                                style: GoogleFonts.nunito(
-                                  fontSize: 13,
-                                  fontWeight: FontWeight.w400,
-                                  color: AppColors.textGray,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                        const Icon(
-                          Icons.chevron_right_rounded,
-                          color: AppColors.textGray,
-                          size: 20,
-                        ),
-                      ],
-                    ),
+          : Column(children: [
+              Padding(
+                padding: const EdgeInsets.fromLTRB(20, 12, 20, 8),
+                child: TextField(
+                  controller: _searchController,
+                  onChanged: (_) => setState(() {}),
+                  decoration: InputDecoration(
+                    hintText: 'Rechercher une catégorie',
+                    prefixIcon: const Icon(Icons.search),
+                    border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(14)),
                   ),
-                );
-              },
-            ),
+                ),
+              ),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 20),
+                child: Row(children: [
+                  FilterChip(
+                    label: const Text('10 questions ou plus'),
+                    selected: _onlyPlayable,
+                    onSelected: (value) =>
+                        setState(() => _onlyPlayable = value),
+                  ),
+                ]),
+              ),
+              Expanded(
+                  child: filtered.isEmpty
+                      ? const Center(
+                          child: Text('Aucune catégorie ne correspond.'))
+                      : ListView.separated(
+                          padding: const EdgeInsets.all(20),
+                          itemCount: filtered.length,
+                          separatorBuilder: (_, __) =>
+                              const SizedBox(height: 12),
+                          itemBuilder: (BuildContext context, int index) {
+                            final Map<String, dynamic> category =
+                                filtered[index];
+                            final ({
+                              Color bgColor,
+                              Color iconColor,
+                              IconData icon
+                            }) style = _getCategoryStyle(index);
+                            final String categoryName =
+                                (category['name'] as String?)
+                                            ?.trim()
+                                            .isNotEmpty ==
+                                        true
+                                    ? (category['name'] as String).trim()
+                                    : 'Catégorie';
+                            final int questionsCount =
+                                (category['questions_count'] as num?)
+                                        ?.toInt() ??
+                                    0;
+
+                            return GestureDetector(
+                              onTap: () {
+                                if (widget.selectedMode == 'mixed') {
+                                  context.push('/quiz/null/mixed');
+                                  return;
+                                }
+                                context.push(
+                                    '/quiz/${category['id']}/${widget.selectedMode}');
+                              },
+                              child: Container(
+                                padding: const EdgeInsets.all(16),
+                                decoration: BoxDecoration(
+                                  color: style.bgColor,
+                                  borderRadius: const BorderRadius.all(
+                                      Radius.circular(16)),
+                                ),
+                                child: Row(
+                                  children: <Widget>[
+                                    Container(
+                                      width: 44,
+                                      height: 44,
+                                      decoration: BoxDecoration(
+                                        color: Colors.white.withOpacity(0.6),
+                                        borderRadius: const BorderRadius.all(
+                                            Radius.circular(10)),
+                                      ),
+                                      child: Icon(
+                                        style.icon,
+                                        size: 24,
+                                        color: style.iconColor,
+                                      ),
+                                    ),
+                                    const SizedBox(width: 12),
+                                    Expanded(
+                                      child: Column(
+                                        crossAxisAlignment:
+                                            CrossAxisAlignment.start,
+                                        children: <Widget>[
+                                          Text(
+                                            categoryName,
+                                            style: GoogleFonts.nunito(
+                                              fontSize: 15,
+                                              fontWeight: FontWeight.w700,
+                                              color: AppColors.textDark,
+                                            ),
+                                          ),
+                                          const SizedBox(height: 4),
+                                          Text(
+                                            '$questionsCount questions disponibles',
+                                            style: GoogleFonts.nunito(
+                                              fontSize: 13,
+                                              fontWeight: FontWeight.w400,
+                                              color: AppColors.textGray,
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                    const Icon(
+                                      Icons.chevron_right_rounded,
+                                      color: AppColors.textGray,
+                                      size: 20,
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            );
+                          },
+                        )),
+            ]),
     );
   }
 }

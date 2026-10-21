@@ -23,6 +23,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   String _selectedMode = 'category';
   List<Map<String, dynamic>> _categories = <Map<String, dynamic>>[];
   Map<String, dynamic>? _lastSession;
+  Map<String, dynamic>? _activeDraft;
   Map<String, dynamic>? _user;
   bool _isLoading = true;
   bool _loadingCategories = true;
@@ -69,6 +70,13 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
       if (!mounted) return;
 
       final cached = prefs.getString('home_cache');
+      final draft = prefs.getString('active_quiz_draft');
+      if (draft != null) {
+        final decodedDraft = jsonDecode(draft);
+        if (decodedDraft is Map) {
+          _activeDraft = Map<String, dynamic>.from(decodedDraft);
+        }
+      }
       if (cached != null) {
         final data = jsonDecode(cached) as Map<String, dynamic>;
         setState(() {
@@ -124,7 +132,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
 
       // Données essentielles pour rendre la Home : utilisateur + catégories.
       // Elles partent en parallèle et ne sont plus bloquées par l'historique.
-      final results = await Future.wait<Response<dynamic>>(<Future<Response<dynamic>>>[
+      final results =
+          await Future.wait<Response<dynamic>>(<Future<Response<dynamic>>>[
         dio.get<dynamic>('/auth/me'),
         dio.get<dynamic>('/categories'),
       ]);
@@ -240,7 +249,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     return 'Il y a ${diff.inDays}j';
   }
 
-  ({Color bgColor, Color iconColor, IconData icon}) _getCategoryStyle(int index) {
+  ({Color bgColor, Color iconColor, IconData icon}) _getCategoryStyle(
+      int index) {
     switch (index % 3) {
       case 0:
         return (
@@ -358,6 +368,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                 _buildHeader(),
                 const SizedBox(height: 20),
                 _buildModePicker(),
+                _buildResumeDraft(),
                 const SizedBox(height: 24),
                 _buildCategoriesSection(),
                 const SizedBox(height: 24),
@@ -372,9 +383,10 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   }
 
   Widget _buildHeader() {
-    final String fullName = (_user?['name'] as String?)?.trim().isNotEmpty == true
-        ? (_user?['name'] as String)
-        : 'Kouassi Yao';
+    final String fullName =
+        (_user?['name'] as String?)?.trim().isNotEmpty == true
+            ? (_user?['name'] as String)
+            : 'Kouassi Yao';
     final String firstName = fullName.split(RegExp(r'\s+')).first;
     final int score = (_user?['total_score'] as num?)?.toInt() ?? 0;
 
@@ -503,7 +515,46 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
               ),
             ),
           ],
+          const SizedBox(height: 10),
+          SizedBox(
+            width: double.infinity,
+            height: 48,
+            child: OutlinedButton.icon(
+              onPressed: () => context.push('/quiz/null/daily'),
+              icon: const Icon(Icons.today_rounded, color: Color(0xFFF77F00)),
+              label: Text('Questions du jour',
+                  style: GoogleFonts.nunito(
+                    fontWeight: FontWeight.w800,
+                    color: AppColors.textDark,
+                  )),
+            ),
+          ),
         ],
+      ),
+    );
+  }
+
+  Widget _buildResumeDraft() {
+    final draft = _activeDraft;
+    if (draft == null || draft['questions'] is! List)
+      return const SizedBox.shrink();
+    final questions = (draft['questions'] as List).length;
+    final current = ((draft['current_index'] as num?)?.toInt() ?? 0) + 1;
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 20),
+      child: Card(
+        color: const Color(0xFFFFF3E8),
+        child: ListTile(
+          leading: const Icon(Icons.play_circle_fill, color: Color(0xFFF77F00)),
+          title: const Text('Reprendre ma partie'),
+          subtitle:
+              Text('Question ${current.clamp(1, questions)} sur $questions'),
+          trailing: const Icon(Icons.chevron_right),
+          onTap: () => context.push(
+            '/quiz/${draft['category_id'] ?? 'null'}/${draft['mode'] ?? 'mixed'}',
+            extra: draft,
+          ),
+        ),
       ),
     );
   }
@@ -525,7 +576,9 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
         decoration: BoxDecoration(
           color: isSelected ? const Color(0xFFF77F00) : Colors.white,
           borderRadius: const BorderRadius.all(Radius.circular(16)),
-          border: isSelected ? null : Border.all(color: AppColors.neutral, width: 1.5),
+          border: isSelected
+              ? null
+              : Border.all(color: AppColors.neutral, width: 1.5),
           boxShadow: isSelected
               ? <BoxShadow>[
                   BoxShadow(
@@ -560,9 +613,10 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   }
 
   Widget _buildCategoriesSection() {
-    final List<Map<String, dynamic>> previewCategories = _categories.length > _homeCategoriesLimit
-        ? _categories.take(_homeCategoriesLimit).toList()
-        : _categories;
+    final List<Map<String, dynamic>> previewCategories =
+        _categories.length > _homeCategoriesLimit
+            ? _categories.take(_homeCategoriesLimit).toList()
+            : _categories;
     final bool hasMoreCategories = _categories.length > _homeCategoriesLimit;
 
     return Column(
@@ -647,7 +701,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
             separatorBuilder: (_, __) => const SizedBox(height: 12),
             itemBuilder: (BuildContext context, int index) {
               final Map<String, dynamic> category = previewCategories[index];
-              final ({Color bgColor, Color iconColor, IconData icon}) style = _getCategoryStyle(index);
+              final ({Color bgColor, Color iconColor, IconData icon}) style =
+                  _getCategoryStyle(index);
 
               return _buildCategoryCard(
                 category: category,
@@ -663,10 +718,12 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     required Map<String, dynamic> category,
     required ({Color bgColor, Color iconColor, IconData icon}) style,
   }) {
-    final String categoryName = (category['name'] as String?)?.trim().isNotEmpty == true
-        ? (category['name'] as String).trim()
-        : 'Catégorie';
-    final int questionsCount = (category['questions_count'] as num?)?.toInt() ?? 0;
+    final String categoryName =
+        (category['name'] as String?)?.trim().isNotEmpty == true
+            ? (category['name'] as String).trim()
+            : 'Catégorie';
+    final int questionsCount =
+        (category['questions_count'] as num?)?.toInt() ?? 0;
 
     return GestureDetector(
       onTap: () {
@@ -747,8 +804,10 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
 
     final Map<String, dynamic> session = _lastSession!;
     final String categoryName = _getCategoryName(session['category']);
-    final String scoreText = '${session['correct_answers'] ?? 0}/10 · ${session['total_score'] ?? 0} pts';
-    final String completedAt = (session['completed_at'] as String?) ?? DateTime.now().toIso8601String();
+    final String scoreText =
+        '${session['correct_answers'] ?? 0}/10 · ${session['total_score'] ?? 0} pts';
+    final String completedAt = (session['completed_at'] as String?) ??
+        DateTime.now().toIso8601String();
 
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 20),
@@ -855,8 +914,10 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     }
 
     if (rawCategory is List) {
-      final Iterable<Map<dynamic, dynamic>> categories = rawCategory.whereType<Map<dynamic, dynamic>>();
-      final Map<dynamic, dynamic>? firstCategory = categories.isNotEmpty ? categories.first : null;
+      final Iterable<Map<dynamic, dynamic>> categories =
+          rawCategory.whereType<Map<dynamic, dynamic>>();
+      final Map<dynamic, dynamic>? firstCategory =
+          categories.isNotEmpty ? categories.first : null;
       final dynamic rawName = firstCategory?['name'];
       if (rawName is String && rawName.trim().isNotEmpty) {
         return rawName;
@@ -882,7 +943,8 @@ class _SkeletonBox extends StatefulWidget {
   State<_SkeletonBox> createState() => _SkeletonBoxState();
 }
 
-class _SkeletonBoxState extends State<_SkeletonBox> with SingleTickerProviderStateMixin {
+class _SkeletonBoxState extends State<_SkeletonBox>
+    with SingleTickerProviderStateMixin {
   late AnimationController _controller;
   late Animation<double> _animation;
 

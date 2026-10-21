@@ -1,7 +1,9 @@
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
+import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 import '../../../core/config/api_config.dart';
@@ -75,7 +77,8 @@ class _FriendsScreenState extends State<FriendsScreen> {
       final Dio dio = await _createDio();
       if (!mounted) return;
 
-      final List<Response<dynamic>> results = await Future.wait<Response<dynamic>>(
+      final List<Response<dynamic>> results =
+          await Future.wait<Response<dynamic>>(
         <Future<Response<dynamic>>>[
           dio.get<dynamic>('/friends'),
           dio.get<dynamic>('/friends/requests'),
@@ -337,6 +340,54 @@ class _FriendsScreenState extends State<FriendsScreen> {
     }
   }
 
+  Future<void> _createChallenge(int friendId, String friendName) async {
+    try {
+      final dio = await _createDio();
+      final response = await dio.post<dynamic>('/challenges',
+          data: <String, dynamic>{'opponent_id': friendId});
+      final data = response.data is Map ? response.data['data'] : null;
+      final code = data is Map ? data['code']?.toString() : null;
+      if (code == null || !mounted) return;
+      await Clipboard.setData(ClipboardData(text: code));
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text(
+              'Défi créé contre $friendName · code $code copié. Envoyez-le à votre ami.')));
+      if (mounted) context.push('/challenge/$code');
+    } on DioException catch (error) {
+      final body = error.response?.data;
+      final message = body is Map ? body['message']?.toString() : null;
+      if (mounted)
+        ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text(message ?? 'Impossible de créer le défi.')));
+    }
+  }
+
+  Future<void> _showJoinChallengeDialog() async {
+    final controller = TextEditingController();
+    final code = await showDialog<String>(
+        context: context,
+        builder: (dialogContext) => AlertDialog(
+              title: const Text('Rejoindre un défi'),
+              content: TextField(
+                  controller: controller,
+                  textCapitalization: TextCapitalization.characters,
+                  maxLength: 8,
+                  decoration: const InputDecoration(labelText: 'Code du défi')),
+              actions: [
+                TextButton(
+                    onPressed: () => Navigator.pop(dialogContext),
+                    child: const Text('Annuler')),
+                FilledButton(
+                    onPressed: () => Navigator.pop(
+                        dialogContext, controller.text.trim().toUpperCase()),
+                    child: const Text('Jouer'))
+              ],
+            ));
+    controller.dispose();
+    if (code == null || code.isEmpty || !mounted) return;
+    context.push('/challenge/$code');
+  }
+
   void _showAddFriendModal() {
     final controller = TextEditingController();
     bool isSubmitting = false;
@@ -523,6 +574,12 @@ class _FriendsScreenState extends State<FriendsScreen> {
                           color: _textDark,
                         ),
                       ),
+                      TextButton.icon(
+                        onPressed: _showJoinChallengeDialog,
+                        icon:
+                            const Icon(Icons.sports_kabaddi_outlined, size: 18),
+                        label: const Text('Code défi'),
+                      ),
                       GestureDetector(
                         onTap: _showAddFriendModal,
                         child: Container(
@@ -651,7 +708,9 @@ class _FriendsScreenState extends State<FriendsScreen> {
                                   ),
                                 ),
                                 GestureDetector(
-                                  onTap: requestId > 0 ? () => _acceptRequest(requestId) : null,
+                                  onTap: requestId > 0
+                                      ? () => _acceptRequest(requestId)
+                                      : null,
                                   child: Container(
                                     padding: const EdgeInsets.symmetric(
                                       horizontal: 12,
@@ -673,7 +732,9 @@ class _FriendsScreenState extends State<FriendsScreen> {
                                 ),
                                 const SizedBox(width: 8),
                                 GestureDetector(
-                                  onTap: requestId > 0 ? () => _deleteRequest(requestId) : null,
+                                  onTap: requestId > 0
+                                      ? () => _deleteRequest(requestId)
+                                      : null,
                                   child: Container(
                                     padding: const EdgeInsets.all(8),
                                     decoration: BoxDecoration(
@@ -689,7 +750,10 @@ class _FriendsScreenState extends State<FriendsScreen> {
                                 ),
                               ],
                             ),
-                          ).animate().fadeIn(duration: 300.ms).slideX(begin: 0.1),
+                          )
+                              .animate()
+                              .fadeIn(duration: 300.ms)
+                              .slideX(begin: 0.1),
                         );
                       },
                       childCount: _requests.length,
@@ -760,8 +824,9 @@ class _FriendsScreenState extends State<FriendsScreen> {
                       final Map<String, dynamic> friendData =
                           friendUser.isNotEmpty ? friendUser : friend;
                       final String name = _extractName(friendData);
-                      final Object score =
-                          friendData['total_score'] ?? friend['total_score'] ?? 0;
+                      final Object score = friendData['total_score'] ??
+                          friend['total_score'] ??
+                          0;
                       final int friendId = _extractId(
                         friend,
                         const <String>[
@@ -825,8 +890,18 @@ class _FriendsScreenState extends State<FriendsScreen> {
                                   ],
                                 ),
                               ),
+                              IconButton(
+                                tooltip: 'Défier $name',
+                                onPressed: friendId > 0
+                                    ? () => _createChallenge(friendId, name)
+                                    : null,
+                                icon: const Icon(Icons.sports_kabaddi_outlined,
+                                    color: _orange),
+                              ),
                               GestureDetector(
-                                onTap: friendId > 0 ? () => _deleteRequest(friendId) : null,
+                                onTap: friendId > 0
+                                    ? () => _deleteRequest(friendId)
+                                    : null,
                                 child: const Icon(
                                   Icons.person_remove_outlined,
                                   color: _textGray,
@@ -864,7 +939,8 @@ class _FriendsScreenState extends State<FriendsScreen> {
       return '?';
     }
 
-    final parts = sanitized.split(RegExp(r'\s+')).where((e) => e.isNotEmpty).toList();
+    final parts =
+        sanitized.split(RegExp(r'\s+')).where((e) => e.isNotEmpty).toList();
     if (parts.length >= 2) {
       return '${parts[0][0]}${parts[1][0]}'.toUpperCase();
     }

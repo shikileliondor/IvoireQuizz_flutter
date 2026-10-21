@@ -1,7 +1,13 @@
+import 'dart:async';
+
+import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
+
+import '../../../core/config/api_config.dart';
 
 const _orange = Color(0xFFF77F00);
 const _gold = Color(0xFFFFD700);
@@ -37,7 +43,8 @@ class ResultScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final int correctAnswers = resultData['correct_answers'] ?? 0;
-    const int totalQuestions = 10;
+    final int totalQuestions =
+        (resultData['total_questions'] as num?)?.toInt() ?? 10;
     final int totalScore = resultData['total_score'] ?? 0;
     final int bonusScore = resultData['bonus_score'] ?? 0;
     final int baseScore = resultData['score'] ?? 0;
@@ -50,8 +57,30 @@ class ResultScreen extends StatelessWidget {
         child: SingleChildScrollView(
           child: Column(
             children: [
+              if (resultData['offline'] == true)
+                Container(
+                  width: double.infinity,
+                  margin: const EdgeInsets.fromLTRB(20, 16, 20, 0),
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFFFF3E8),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: const Text(
+                    'Partie hors ligne : résultat enregistré sur cet appareil, non compté dans le classement.',
+                  ),
+                ),
+              if (resultData['challenge_code'] != null)
+                _ChallengeStatus(
+                  code: resultData['challenge_code'].toString(),
+                  initialStatus: resultData['challenge_status']?.toString(),
+                  initialChallengerScore:
+                      resultData['challenger_score'] as int?,
+                  initialOpponentScore: resultData['opponent_score'] as int?,
+                ),
               _buildHeader(correctAnswers, totalQuestions, categoryName),
-              _buildScoreCard(correctAnswers, totalScore, bonusScore, baseScore),
+              _buildScoreCard(
+                  correctAnswers, totalScore, bonusScore, baseScore),
               _buildAnswersList(answers),
               _buildButtons(context, resultData),
               const SizedBox(height: 24),
@@ -62,7 +91,8 @@ class ResultScreen extends StatelessWidget {
     );
   }
 
-  Widget _buildHeader(int correctAnswers, int totalQuestions, String categoryName) {
+  Widget _buildHeader(
+      int correctAnswers, int totalQuestions, String categoryName) {
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(24),
@@ -90,10 +120,7 @@ class ResultScreen extends StatelessWidget {
                 ),
               );
             },
-          )
-              .animate()
-              .fadeIn(duration: 600.ms)
-              .scale(
+          ).animate().fadeIn(duration: 600.ms).scale(
                 begin: const Offset(0.5, 0.5),
                 duration: 600.ms,
                 curve: Curves.elasticOut,
@@ -305,8 +332,9 @@ class ResultScreen extends StatelessWidget {
               margin: const EdgeInsets.only(bottom: 10),
               padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(
-                color:
-                    isCorrect ? const Color(0xFFE8F5E9) : const Color(0xFFFFEBEB),
+                color: isCorrect
+                    ? const Color(0xFFE8F5E9)
+                    : const Color(0xFFFFEBEB),
                 borderRadius: const BorderRadius.all(Radius.circular(14)),
                 border: Border.all(
                   color: isCorrect ? _correct : _incorrect,
@@ -515,6 +543,77 @@ class ResultScreen extends StatelessWidget {
           ),
         ],
       ),
+    );
+  }
+}
+
+class _ChallengeStatus extends StatefulWidget {
+  const _ChallengeStatus(
+      {required this.code,
+      this.initialStatus,
+      this.initialChallengerScore,
+      this.initialOpponentScore});
+  final String code;
+  final String? initialStatus;
+  final int? initialChallengerScore;
+  final int? initialOpponentScore;
+
+  @override
+  State<_ChallengeStatus> createState() => _ChallengeStatusState();
+}
+
+class _ChallengeStatusState extends State<_ChallengeStatus> {
+  static const _storage = FlutterSecureStorage();
+  Timer? _timer;
+  String? _status;
+  int? _challengerScore;
+  int? _opponentScore;
+
+  @override
+  void initState() {
+    super.initState();
+    _status = widget.initialStatus;
+    _challengerScore = widget.initialChallengerScore;
+    _opponentScore = widget.initialOpponentScore;
+    _refresh();
+    _timer = Timer.periodic(const Duration(seconds: 5), (_) => _refresh());
+  }
+
+  Future<void> _refresh() async {
+    try {
+      final token = await _storage.read(key: 'auth_token');
+      final response = await ApiConfig.createDio(authToken: token)
+          .get('/challenges/${widget.code}');
+      final payload = response.data is Map ? response.data['data'] : null;
+      if (!mounted || payload is! Map) return;
+      setState(() {
+        _status = payload['status']?.toString();
+        _challengerScore = (payload['challenger_score'] as num?)?.toInt();
+        _opponentScore = (payload['opponent_score'] as num?)?.toInt();
+      });
+      if (_status == 'completed') _timer?.cancel();
+    } catch (_) {}
+  }
+
+  @override
+  void dispose() {
+    _timer?.cancel();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final completed = _status == 'completed';
+    return Container(
+      width: double.infinity,
+      margin: const EdgeInsets.fromLTRB(20, 16, 20, 0),
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+          color: const Color(0xFFEAF2FF),
+          borderRadius: BorderRadius.circular(12)),
+      child: Text(completed
+          ? 'Défi ${widget.code} terminé · scores : ${_challengerScore ?? 0} — ${_opponentScore ?? 0}'
+          : 'Score envoyé · ${_challengerScore ?? '—'} — ${_opponentScore ?? '—'} · en attente de votre ami.'),
     );
   }
 }

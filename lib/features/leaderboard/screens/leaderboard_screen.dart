@@ -414,16 +414,6 @@ class _LeaderboardScreenState extends State<LeaderboardScreen>
         children: <Widget>[
           Row(
             children: <Widget>[
-              IconButton(
-                onPressed: () => context.pop(),
-                icon: const Icon(
-                  Icons.arrow_back_ios_new_rounded,
-                  color: _textDark,
-                  size: 20,
-                ),
-                tooltip: 'Retour',
-              ),
-              const SizedBox(width: 8),
               Expanded(
                 child: Text(
                   'Classement',

@@ -4,7 +4,10 @@ import 'package:flutter/foundation.dart';
 class ApiConfig {
   ApiConfig._();
 
-  static const String baseUrl = 'http://ivoirquizz.studiobeyam.tech';
+  static const String baseUrl = String.fromEnvironment(
+    'API_BASE_URL',
+    defaultValue: 'http://ivoirquizz.studiobeyam.tech',
+  );
   static const String apiBaseUrl = '$baseUrl/api';
 
   static const Duration connectTimeout = Duration(seconds: 10);
