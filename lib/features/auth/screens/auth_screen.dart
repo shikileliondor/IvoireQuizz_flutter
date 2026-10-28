@@ -64,8 +64,11 @@ class _AuthScreenState extends State<AuthScreen>
 
   Dio _createDio() => ApiConfig.createDio();
 
-  static const String _configuredGoogleWebClientId =
-      String.fromEnvironment('GOOGLE_WEB_CLIENT_ID');
+  static const String _configuredGoogleWebClientId = String.fromEnvironment(
+    'GOOGLE_WEB_CLIENT_ID',
+    defaultValue:
+        '121288560456-jj4rih1vl48d655tklm6n30o0g17d5f7.apps.googleusercontent.com',
+  );
 
   static String? get _googleWebClientId =>
       _configuredGoogleWebClientId.trim().isEmpty

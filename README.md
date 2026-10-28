@@ -6,9 +6,10 @@ Application Flutter de quiz de culture générale ivoirienne.
 
 Le backend attend un `idToken` Google sur `POST /api/auth/google`. Le client
 OAuth **Web** du même projet Google est transmis comme `serverClientId` afin que
-`google_sign_in` retourne ce jeton. Le dépôt ne contient pas d'identifiant OAuth
-configuré : remplacez la valeur d'exemple ci-dessous par votre ID client Web
-réel (`...apps.googleusercontent.com`).
+`google_sign_in` retourne ce jeton. L'ID client Web du projet
+(`121288560456-jj4rih1vl48d655tklm6n30o0g17d5f7.apps.googleusercontent.com`) est
+la valeur par défaut dans `auth_screen.dart` ; `--dart-define` permet de le
+remplacer.
 
 ### Android
 
@@ -28,8 +29,10 @@ Google Sign-In sur iOS.
 ### Lancement et build
 
 ```bash
-flutter run --dart-define=GOOGLE_WEB_CLIENT_ID="VOTRE_ID_CLIENT_WEB.apps.googleusercontent.com"
-flutter build appbundle --dart-define=GOOGLE_WEB_CLIENT_ID="VOTRE_ID_CLIENT_WEB.apps.googleusercontent.com"
+flutter run
+flutter build appbundle
+# Pour utiliser un autre client Web :
+flutter run --dart-define=GOOGLE_WEB_CLIENT_ID="AUTRE_ID_CLIENT_WEB.apps.googleusercontent.com"
 ```
 
 L'ID client OAuth est un identifiant public. Ne mettez jamais de secret client
