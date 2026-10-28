@@ -8,6 +8,8 @@ import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 import '../../../core/config/api_config.dart';
+import '../models/result_score.dart';
+import '../widgets/result_celebration.dart';
 
 const _orange = Color(0xFFF77F00);
 const _gold = Color(0xFFFFD700);
@@ -26,162 +28,71 @@ class ResultScreen extends StatelessWidget {
     required this.resultData,
   });
 
-  String _getMessage(int correct) {
-    if (correct == 10) return 'Parfait ! Tu es un vrai Ivoirien !';
-    if (correct >= 7) return 'Très bien ! Tu connais bien ton pays !';
-    if (correct >= 4) return 'Pas mal ! Continue à apprendre !';
-    return 'Courage ! Tu feras mieux la prochaine fois !';
-  }
-
-  String _getEmoji(int correct) {
-    if (correct == 10) return 'assets/effobi reflechit.png';
-    if (correct >= 7) return 'assets/effobi reflechit.png';
-    if (correct >= 4) return 'assets/effobi reflechit.png';
-    return 'assets/effobi reflechit.png';
-  }
-
   @override
   Widget build(BuildContext context) {
-    final int correctAnswers = resultData['correct_answers'] ?? 0;
-    final int totalQuestions =
-        (resultData['total_questions'] as num?)?.toInt() ?? 10;
-    final int totalScore = resultData['total_score'] ?? 0;
-    final int bonusScore = resultData['bonus_score'] ?? 0;
-    final int baseScore = resultData['score'] ?? 0;
+    final ResultScore score = ResultScore.fromResultData(resultData);
+    final int correctAnswers = score.correctAnswers;
+    final int totalQuestions = score.totalQuestions;
+    final int totalScore = score.totalScore;
+    final int bonusScore = score.bonusScore;
+    final int baseScore = score.baseScore;
     final String categoryName = resultData['category']?['name'] ?? 'Quiz mixte';
     final List answers = resultData['answers'] ?? [];
+    final ResultOutcome outcome =
+        ResultOutcome.fromScore(correctAnswers, totalQuestions);
+    final bool showConfetti =
+        outcome.celebrates && !MediaQuery.of(context).disableAnimations;
 
     return Scaffold(
       backgroundColor: Colors.white,
-      body: SafeArea(
-        child: SingleChildScrollView(
-          child: Column(
-            children: [
-              if (resultData['offline'] == true)
-                Container(
-                  width: double.infinity,
-                  margin: const EdgeInsets.fromLTRB(20, 16, 20, 0),
-                  padding: const EdgeInsets.all(12),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFFFFF3E8),
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: const Text(
-                    'Partie hors ligne : résultat enregistré sur cet appareil, non compté dans le classement.',
-                  ),
-                ),
-              if (resultData['challenge_code'] != null)
-                _ChallengeStatus(
-                  code: resultData['challenge_code'].toString(),
-                  initialStatus: resultData['challenge_status']?.toString(),
-                  initialChallengerScore:
-                      resultData['challenger_score'] as int?,
-                  initialOpponentScore: resultData['opponent_score'] as int?,
-                ),
-              _buildHeader(correctAnswers, totalQuestions, categoryName),
-              _buildScoreCard(
-                  correctAnswers, totalScore, bonusScore, baseScore),
-              _buildAnswersList(answers),
-              _buildButtons(context, resultData),
-              const SizedBox(height: 24),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildHeader(
-      int correctAnswers, int totalQuestions, String categoryName) {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(24),
-      decoration: const BoxDecoration(
-        color: Color(0xFFFFF8F0),
-        borderRadius: BorderRadius.only(
-          bottomLeft: Radius.circular(32),
-          bottomRight: Radius.circular(32),
-        ),
-      ),
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
+      body: Stack(
         children: [
-          Image.asset(
-            _getEmoji(correctAnswers),
-            height: correctAnswers >= 7 ? 120 : 90,
-            fit: BoxFit.contain,
-            errorBuilder: (context, error, stack) {
-              return Container(
-                color: const Color(0xFFFFF3E8),
-                child: const Icon(
-                  Icons.pets,
-                  color: Color(0xFFF77F00),
-                  size: 40,
-                ),
-              );
-            },
-          ).animate().fadeIn(duration: 600.ms).scale(
-                begin: const Offset(0.5, 0.5),
-                duration: 600.ms,
-                curve: Curves.elasticOut,
-              ),
-          const SizedBox(height: 16),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            crossAxisAlignment: CrossAxisAlignment.end,
-            children: [
-              Text(
-                '$correctAnswers',
-                style: GoogleFonts.nunito(
-                  fontSize: 72,
-                  fontWeight: FontWeight.w800,
-                  color: correctAnswers >= 7 ? _correct : _incorrect,
-                  height: 1,
-                ),
-              ),
-              Padding(
-                padding: const EdgeInsets.only(top: 24, bottom: 10),
-                child: Text(
-                  '/$totalQuestions',
-                  style: GoogleFonts.nunito(
-                    fontSize: 32,
-                    fontWeight: FontWeight.w700,
-                    color: _textGray,
-                    height: 1,
+          SafeArea(
+            child: SingleChildScrollView(
+              child: Column(
+                children: [
+                  if (resultData['offline'] == true)
+                    Container(
+                      width: double.infinity,
+                      margin: const EdgeInsets.fromLTRB(20, 16, 20, 0),
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFFFF3E8),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: const Text(
+                        'Partie hors ligne : résultat enregistré sur cet appareil, non compté dans le classement.',
+                      ),
+                    ),
+                  if (resultData['challenge_code'] != null)
+                    _ChallengeStatus(
+                      code: resultData['challenge_code'].toString(),
+                      initialStatus: resultData['challenge_status']?.toString(),
+                      initialChallengerScore:
+                          parseScoreValue(resultData['challenger_score']),
+                      initialOpponentScore:
+                          parseScoreValue(resultData['opponent_score']),
+                    ),
+                  ResultCelebrationHeader(
+                    correctAnswers: correctAnswers,
+                    totalQuestions: totalQuestions,
+                    categoryName: categoryName,
                   ),
-                ),
-              ),
-            ],
-          )
-              .animate()
-              .fadeIn(duration: 400.ms, delay: 300.ms)
-              .slideY(begin: 0.3, delay: 300.ms),
-          const SizedBox(height: 8),
-          Text(
-            _getMessage(correctAnswers),
-            textAlign: TextAlign.center,
-            style: GoogleFonts.nunito(
-              fontSize: 16,
-              fontWeight: FontWeight.w600,
-              color: _textDark,
-            ),
-          ).animate().fadeIn(duration: 400.ms, delay: 400.ms),
-          const SizedBox(height: 8),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-            decoration: BoxDecoration(
-              color: _neutral,
-              borderRadius: const BorderRadius.all(Radius.circular(20)),
-            ),
-            child: Text(
-              categoryName,
-              style: GoogleFonts.nunito(
-                fontSize: 13,
-                fontWeight: FontWeight.w400,
-                color: _textGray,
+                  _buildScoreCard(
+                      correctAnswers, totalScore, bonusScore, baseScore),
+                  _buildAnswersList(answers),
+                  _buildButtons(context, resultData),
+                  const SizedBox(height: 24),
+                ],
               ),
             ),
-          ).animate().fadeIn(duration: 400.ms, delay: 500.ms),
+          ),
+          if (showConfetti)
+            Positioned.fill(
+              child: ConfettiBurst(
+                pieces: outcome == ResultOutcome.perfect ? 140 : 90,
+              ),
+            ),
         ],
       ),
     );
@@ -226,7 +137,20 @@ class ResultScreen extends StatelessWidget {
                     color: _gold,
                     height: 1,
                   ),
-                ).animate().fadeIn(duration: 400.ms, delay: 600.ms),
+                ).animate().fadeIn(duration: 400.ms, delay: 600.ms).custom(
+                      delay: 600.ms,
+                      duration: 1200.ms,
+                      curve: Curves.easeOutCubic,
+                      builder: (context, value, child) => Text(
+                        '${(totalScore * value).round()}',
+                        style: GoogleFonts.nunito(
+                          fontSize: 48,
+                          fontWeight: FontWeight.w800,
+                          color: _gold,
+                          height: 1,
+                        ),
+                      ),
+                    ),
                 Padding(
                   padding: const EdgeInsets.only(bottom: 8),
                   child: Text(
@@ -477,6 +401,10 @@ class ResultScreen extends StatelessWidget {
               onPressed: () {
                 final categoryId = resultData['category']?['id'];
                 final mode = resultData['mode'] ?? 'category';
+                if (mode == 'campaign') {
+                  context.go('/campaign');
+                  return;
+                }
                 context.go('/quiz/$categoryId/$mode');
               },
               style: ElevatedButton.styleFrom(
@@ -588,8 +516,8 @@ class _ChallengeStatusState extends State<_ChallengeStatus> {
       if (!mounted || payload is! Map) return;
       setState(() {
         _status = payload['status']?.toString();
-        _challengerScore = (payload['challenger_score'] as num?)?.toInt();
-        _opponentScore = (payload['opponent_score'] as num?)?.toInt();
+        _challengerScore = parseScoreValue(payload['challenger_score']);
+        _opponentScore = parseScoreValue(payload['opponent_score']);
       });
       if (_status == 'completed') _timer?.cancel();
     } catch (_) {}

@@ -8,6 +8,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import '../../../core/audio/app_audio_controller.dart';
 import '../../../core/config/api_config.dart';
 import '../../../main.dart' show appTextScale, appHighContrast, appReduceMotion;
 
@@ -110,6 +111,49 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 ],
               ),
             ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _audioSettings() {
+    final AppAudioController audio = AppAudioController.instance;
+    return AnimatedBuilder(
+      animation: audio,
+      builder: (context, _) => Card(
+        margin: const EdgeInsets.fromLTRB(20, 10, 20, 0),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: 6),
+          child: Column(
+            children: [
+              ListTile(
+                leading: const Icon(Icons.volume_up_rounded, color: _orange),
+                title: Text(
+                  'Son',
+                  style: GoogleFonts.nunito(
+                    fontWeight: FontWeight.w800,
+                    fontSize: 16,
+                    color: _textDark,
+                  ),
+                ),
+                subtitle: const Text('Musique et effets du jeu'),
+              ),
+              SwitchListTile(
+                secondary: const Icon(Icons.music_note_rounded),
+                title: const Text('Musique'),
+                subtitle: const Text('Ambiance musicale dans toute l’app'),
+                value: audio.musicEnabled,
+                onChanged: audio.setMusicEnabled,
+              ),
+              SwitchListTile(
+                secondary: const Icon(Icons.sports_esports_rounded),
+                title: const Text('Effets sonores'),
+                subtitle: const Text('Réponses, victoire et défaite'),
+                value: audio.effectsEnabled,
+                onChanged: audio.setEffectsEnabled,
+              ),
+            ],
           ),
         ),
       ),
@@ -389,6 +433,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 const SizedBox(height: 12),
                 _buildProfileActions(friendCode),
                 _buildProgressSections(categoryStats),
+                _audioSettings(),
                 _accessibilitySettings(),
                 const SizedBox(height: 10),
                 _buildLogoutButton(),

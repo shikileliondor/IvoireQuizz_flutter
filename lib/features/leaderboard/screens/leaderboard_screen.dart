@@ -6,6 +6,7 @@ import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 import '../../../core/config/api_config.dart';
+import '../utils/leaderboard_score.dart';
 
 const _orange = Color(0xFFF77F00);
 const _gold = Color(0xFFFFD700);
@@ -449,16 +450,12 @@ class _LeaderboardScreenState extends State<LeaderboardScreen>
       if (nestedUser.isEmpty) ...item,
     };
 
-    final int score = _extractScore(user, fallback: _extractScore(item));
-    if (score > 0) {
-      user['total_score'] = score;
-    } else {
-      user['total_score'] = user['total_score'] ??
-          user['score'] ??
-          item['total_score'] ??
-          item['score'] ??
-          0;
-    }
+    // La métrique classée (campagne ou semaine) appartient généralement à la
+    // ligne externe ; les informations du joueur sont imbriquées dans `user`.
+    user['total_score'] = leaderboardScore(
+      item,
+      fallback: leaderboardScore(user),
+    );
 
     user['id'] =
         user['id'] ?? item['user_id'] ?? item['friend_id'] ?? item['id'];
@@ -512,20 +509,7 @@ class _LeaderboardScreenState extends State<LeaderboardScreen>
   }
 
   int _extractScore(Map<String, dynamic> user, {int fallback = 0}) {
-    for (final String key in const <String>[
-      'total_score',
-      'score',
-      'points',
-      'xp',
-      'best_score',
-      'quiz_score',
-    ]) {
-      final dynamic value = user[key];
-      final int? parsed = int.tryParse((value ?? '').toString());
-      if (parsed != null) return parsed;
-    }
-
-    return fallback;
+    return leaderboardScore(user, fallback: fallback);
   }
 
   String _extractName(Map<String, dynamic> user, {String fallback = 'Joueur'}) {

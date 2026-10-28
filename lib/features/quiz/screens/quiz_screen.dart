@@ -8,8 +8,10 @@ import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import '../../../core/audio/app_audio_controller.dart';
 import '../../../core/config/api_config.dart';
 import '../utils/question_payload.dart';
+import '../utils/score_calculator.dart';
 
 const _orange = Color(0xFFF77F00);
 const _textDark = Color(0xFF1A1A2E);
@@ -55,8 +57,8 @@ class _QuizScreenState extends State<QuizScreen> {
   String? _questionLoadError;
   bool _isSubmitting = false;
   bool _isCampaignAnswerSubmitting = false;
-  String? _campaignAnswerError;
-  bool _campaignFinishPending = false;
+  String? _submitError;
+  bool _finishPending = false;
   int? _campaignCorrectAnswerId;
   int? _campaignPendingResponseTime;
   int _timeLeft = 20;
@@ -105,11 +107,8 @@ class _QuizScreenState extends State<QuizScreen> {
       if (last != null && last['question_id'] == currentId) {
         _selectedOptionId = _asInt(last['selected_option_id']);
         _answered = true;
-        final option = _optionsOf(_questions[_currentIndex]).firstWhere(
-          (item) => item['id'] == _selectedOptionId,
-          orElse: () => <String, dynamic>{},
-        );
-        _isCorrectAnswer = option['is_correct'] == true;
+        _isCorrectAnswer =
+            isCorrectOption(_questions[_currentIndex], _selectedOptionId);
       }
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (!mounted || !_hasStarted) return;
@@ -168,7 +167,6 @@ class _QuizScreenState extends State<QuizScreen> {
       final token = await _storage.read(key: 'auth_token');
 
       debugPrint('=== QUIZ DEBUG ===');
-      debugPrint('TOKEN: $token');
       debugPrint('CATEGORY: ${widget.categoryId}');
       debugPrint('MODE: ${widget.mode}');
 
@@ -500,20 +498,17 @@ class _QuizScreenState extends State<QuizScreen> {
     }
     final responseTime = _questionDuration - _timeLeft;
     final question = _questions[_currentIndex];
-    bool isCorrect = false;
-    if (optionId != null) {
-      final options = _optionsOf(question);
-      final selected = options.firstWhere(
-        (o) => o['id'] == optionId,
-        orElse: () => <String, dynamic>{},
-      );
-      isCorrect = selected['is_correct'] == true;
-    }
+    final bool isCorrect = isCorrectOption(question, optionId);
     setState(() {
       _selectedOptionId = optionId;
       _answered = true;
       _isCorrectAnswer = isCorrect;
     });
+    unawaited(
+      AppAudioController.instance.playEffect(
+        GameSound.forAnswer(isCorrect: isCorrect),
+      ),
+    );
     _answers.add({
       'question_id': question['id'],
       'selected_option_id': optionId,
@@ -534,7 +529,7 @@ class _QuizScreenState extends State<QuizScreen> {
         _answered = false;
         _isCorrectAnswer = false;
         _campaignCorrectAnswerId = null;
-        _campaignAnswerError = null;
+        _submitError = null;
         _campaignPendingResponseTime = null;
         _timeLeft = _questionDuration;
       });
@@ -554,8 +549,8 @@ class _QuizScreenState extends State<QuizScreen> {
     setState(() {
       _selectedOptionId = optionId;
       _isCampaignAnswerSubmitting = true;
-      _campaignAnswerError = null;
-      _campaignFinishPending = false;
+      _submitError = null;
+      _finishPending = false;
     });
 
     try {
@@ -599,6 +594,11 @@ class _QuizScreenState extends State<QuizScreen> {
         _isCampaignAnswerSubmitting = false;
         _campaignPendingResponseTime = null;
       });
+      unawaited(
+        AppAudioController.instance.playEffect(
+          GameSound.forAnswer(isCorrect: _isCorrectAnswer),
+        ),
+      );
       Future.delayed(const Duration(seconds: 2), () {
         if (mounted) _nextQuestion();
       });
@@ -607,7 +607,7 @@ class _QuizScreenState extends State<QuizScreen> {
       final dynamic body = error.response?.data;
       setState(() {
         _isCampaignAnswerSubmitting = false;
-        _campaignAnswerError = body is Map && body['message'] is String
+        _submitError = body is Map && body['message'] is String
             ? body['message'] as String
             : 'La réponse n’a pas été envoyée. Vérifie ta connexion et réessaie.';
       });
@@ -615,7 +615,7 @@ class _QuizScreenState extends State<QuizScreen> {
       if (!mounted) return;
       setState(() {
         _isCampaignAnswerSubmitting = false;
-        _campaignAnswerError = error is StateError
+        _submitError = error is StateError
             ? error.message
             : 'La réponse n’a pas été envoyée. Réessaie.';
       });
@@ -670,19 +670,19 @@ class _QuizScreenState extends State<QuizScreen> {
         final dynamic body = error.response?.data;
         setState(() {
           _isSubmitting = false;
-          _campaignAnswerError = body is Map && body['message'] is String
+          _submitError = body is Map && body['message'] is String
               ? body['message'] as String
               : 'Impossible de terminer la session. Réessaie.';
-          _campaignFinishPending = true;
+          _finishPending = true;
         });
       } catch (error) {
         if (!mounted) return;
         setState(() {
           _isSubmitting = false;
-          _campaignAnswerError = error is StateError
+          _submitError = error is StateError
               ? error.message
               : 'Impossible de terminer la session. Réessaie.';
-          _campaignFinishPending = true;
+          _finishPending = true;
         });
       }
       return;
@@ -716,22 +716,24 @@ class _QuizScreenState extends State<QuizScreen> {
         }
       } catch (e) {
         debugPrint('CHALLENGE SUBMIT ERROR: $e');
-        if (mounted) setState(() => _isSubmitting = false);
+        if (!mounted) return;
+        final dynamic body = e is DioException ? e.response?.data : null;
+        setState(() {
+          _isSubmitting = false;
+          _submitError = body is Map && body['message'] is String
+              ? body['message'] as String
+              : 'Impossible d’envoyer ton score de défi. Réessaie.';
+          _finishPending = true;
+        });
       }
       return;
     }
     if (_offlineGame) {
-      final correct = _answers.where((answer) {
-        final question =
-            _questions.firstWhere((q) => q['id'] == answer['question_id']);
-        final selected = _optionsOf(question)
-            .where((o) => o['id'] == answer['selected_option_id']);
-        return selected.isNotEmpty && selected.first['is_correct'] == true;
-      }).length;
+      final correct = countCorrectAnswers(_questions, _answers);
       final result = <String, dynamic>{
         'correct_answers': correct,
         'total_questions': _questions.length,
-        'total_score': correct * 100,
+        'total_score': correct * offlinePointsPerCorrectAnswer,
         'duration_seconds':
             ((DateTime.now().millisecondsSinceEpoch - _sessionStartTime) / 1000)
                 .round(),
@@ -772,10 +774,30 @@ class _QuizScreenState extends State<QuizScreen> {
         if (mounted) {
           context.go('/result', extra: sessionData['data']);
         }
+      } else {
+        throw StateError('Le serveur n’a pas enregistré la partie. Réessaie.');
       }
+    } on DioException catch (e) {
+      debugPrint('SUBMIT ERROR ${e.response?.statusCode}: ${e.response?.data}');
+      if (!mounted) return;
+      final dynamic body = e.response?.data;
+      setState(() {
+        _isSubmitting = false;
+        _submitError = body is Map && body['message'] is String
+            ? body['message'] as String
+            : 'Impossible d’enregistrer la partie. Vérifie ta connexion et réessaie.';
+        _finishPending = true;
+      });
     } catch (e) {
       debugPrint('SUBMIT ERROR: $e');
-      setState(() => _isSubmitting = false);
+      if (!mounted) return;
+      setState(() {
+        _isSubmitting = false;
+        _submitError = e is StateError
+            ? e.message
+            : 'Impossible d’enregistrer la partie. Réessaie.';
+        _finishPending = true;
+      });
     }
   }
 
@@ -1411,7 +1433,7 @@ class _QuizScreenState extends State<QuizScreen> {
                   const SizedBox(height: 18),
                   _buildQuestionCard(),
                   const SizedBox(height: 24),
-                  if (_campaignAnswerError != null) ...[
+                  if (_submitError != null) ...[
                     Container(
                       padding: const EdgeInsets.all(14),
                       decoration: BoxDecoration(
@@ -1421,19 +1443,19 @@ class _QuizScreenState extends State<QuizScreen> {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Text(_campaignAnswerError!,
+                          Text(_submitError!,
                               style: GoogleFonts.nunito(
                                   color: _incorrect,
                                   fontWeight: FontWeight.w700)),
                           TextButton(
                             onPressed: _isSubmitting
                                 ? null
-                                : _campaignFinishPending
+                                : _finishPending
                                     ? _submitSession
                                     : () => _submitCampaignAnswer(
                                           _selectedOptionId,
                                         ),
-                            child: Text(_campaignFinishPending
+                            child: Text(_finishPending
                                 ? 'Réessayer la fin de partie'
                                 : 'Réessayer l’envoi'),
                           ),

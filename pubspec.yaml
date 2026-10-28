@@ -32,6 +32,7 @@ dependencies:
 
   # UX
   fluttertoast: ^9.0.0
+  audioplayers: ^6.8.1
 
   # Utils
   intl: ^0.20.2
@@ -63,6 +64,8 @@ flutter:
   uses-material-design: true
   assets:
     - assets/
+    - assets/audio/
+    - assets/mascot/
 
 flutter_launcher_icons:
   android: true

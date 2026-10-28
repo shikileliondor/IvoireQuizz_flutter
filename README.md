@@ -2,9 +2,11 @@
 
 Application Flutter de quiz de culture générale ivoirienne.
 
+Documentation complète : [docs/](docs/README.md).
+
 ## Google Sign-In
 
-Le backend attend un `idToken` Google sur `POST /api/auth/google`. Le client
+Le backend attend un `idToken` Google sur `POST /api/v1/auth/google`. Le client
 OAuth **Web** du même projet Google est transmis comme `serverClientId` afin que
 `google_sign_in` retourne ce jeton. L'ID client Web du projet
 (`121288560456-jj4rih1vl48d655tklm6n30o0g17d5f7.apps.googleusercontent.com`) est
