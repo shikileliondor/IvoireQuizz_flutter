@@ -6,7 +6,7 @@ class ApiConfig {
 
   static const String baseUrl = String.fromEnvironment(
     'API_BASE_URL',
-    defaultValue: 'http://ivoirquizz.studiobeyam.tech',
+    defaultValue: 'https://laravelquizz.studiobeyam.net',
   );
   static const String apiBaseUrl = '$baseUrl/api';
 
@@ -41,15 +41,17 @@ class _ApiDurationLogInterceptor extends Interceptor {
   @override
   void onRequest(RequestOptions options, RequestInterceptorHandler handler) {
     options.extra[_startedAtKey] = Stopwatch()..start();
-    debugPrint('[API] → ${options.method} ${options.uri}');
+    debugPrint('[API] → ${options.method} ${_safePath(options.uri)}');
     handler.next(options);
   }
 
   @override
-  void onResponse(Response<dynamic> response, ResponseInterceptorHandler handler) {
+  void onResponse(
+      Response<dynamic> response, ResponseInterceptorHandler handler) {
     _log(
       options: response.requestOptions,
       statusCode: response.statusCode,
+      contentLength: response.headers.value('content-length'),
     );
     handler.next(response);
   }
@@ -60,6 +62,7 @@ class _ApiDurationLogInterceptor extends Interceptor {
       options: err.requestOptions,
       statusCode: err.response?.statusCode,
       error: err.type.name,
+      contentLength: err.response?.headers.value('content-length'),
     );
     handler.next(err);
   }
@@ -68,11 +71,33 @@ class _ApiDurationLogInterceptor extends Interceptor {
     required RequestOptions options,
     required int? statusCode,
     String? error,
+    String? contentLength,
   }) {
     final Stopwatch? stopwatch = options.extra[_startedAtKey] as Stopwatch?;
     stopwatch?.stop();
     final int elapsedMs = stopwatch?.elapsedMilliseconds ?? -1;
     final String status = statusCode?.toString() ?? error ?? 'no-status';
-    debugPrint('[API] ← ${options.method} ${options.uri} $status ${elapsedMs}ms');
+    final int? responseBytes = int.tryParse(contentLength ?? '');
+    debugPrint(
+      '[API] ← ${options.method} ${_safePath(options.uri)} $status ${elapsedMs}ms '
+      'response_bytes=${responseBytes?.toString() ?? 'unknown'}',
+    );
+  }
+
+  String _safePath(Uri uri) {
+    final uuid = RegExp(
+      r'^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$',
+    );
+    final segments = uri.pathSegments.map((segment) {
+      final looksLikeOpaqueId =
+          segment.length >= 20 && RegExp(r'^[A-Za-z0-9_-]+$').hasMatch(segment);
+      return int.tryParse(segment) != null ||
+              uuid.hasMatch(segment) ||
+              looksLikeOpaqueId
+          ? ':id'
+          : segment;
+    });
+
+    return '/${segments.join('/')}';
   }
 }

@@ -1,34 +1,42 @@
-# ivoire_quizz
+﻿# Ivoire Quizz
 
 Application Flutter de quiz de culture générale ivoirienne.
 
-## Getting Started
+## Google Sign-In
 
-A few resources to get you started if this is your first Flutter project:
+Le backend attend un `idToken` Google sur `POST /api/auth/google`. Le client
+OAuth **Web** du même projet Google est transmis comme `serverClientId` afin que
+`google_sign_in` retourne ce jeton. Le dépôt ne contient pas d'identifiant OAuth
+configuré : remplacez la valeur d'exemple ci-dessous par votre ID client Web
+réel (`...apps.googleusercontent.com`).
 
-- [Learn Flutter](https://docs.flutter.dev/get-started/learn-flutter)
-- [Write your first Flutter app](https://docs.flutter.dev/get-started/codelab)
-- [Flutter learning resources](https://docs.flutter.dev/reference/learning-resources)
+### Android
 
-For help getting started with Flutter development, view the
-[online documentation](https://docs.flutter.dev/), which offers tutorials,
-samples, guidance on mobile development, and a full API reference.
+Dans le projet Google Cloud du client Web, créez également un client OAuth de
+type **Android** avec le package `com.example.ivoire_quizz`. Enregistrez les
+empreintes SHA-1 et SHA-256 des certificats utilisés pour le développement et
+la publication (debug et release).
 
-## Configuration Google Sign-In
+### iOS
 
-Le backend attend un `idToken` Google sur `POST /auth/google`. Pour que le
-plugin `google_sign_in` puisse fournir ce jeton, lancez l'application avec l'ID
-client **Web** OAuth 2.0 créé dans Google Cloud Console :
+L'identifiant de bundle configuré est `com.example.ivoireQuizz`. Créez un client
+OAuth iOS pour cet identifiant dans le même projet Google. La configuration
+présente n'inclut pas encore de `GoogleService-Info.plist` ni d'URL scheme
+Google; ajoutez la configuration iOS fournie par Google/Firebase avant d'utiliser
+Google Sign-In sur iOS.
+
+### Lancement et build
 
 ```bash
 flutter run --dart-define=GOOGLE_WEB_CLIENT_ID="VOTRE_ID_CLIENT_WEB.apps.googleusercontent.com"
+flutter build appbundle --dart-define=GOOGLE_WEB_CLIENT_ID="VOTRE_ID_CLIENT_WEB.apps.googleusercontent.com"
 ```
 
-Si la connexion échoue encore sur Android avec une erreur `sign_in_failed`,
-vérifiez aussi dans Google Cloud/Firebase que :
+L'ID client OAuth est un identifiant public. Ne mettez jamais de secret client
+OAuth dans l'application. Le flux Flutter envoie l'ID token à l'API, qui le
+valide côté serveur.
 
-- le nom du package Android correspond à `com.example.ivoire_quizz` ;
-- les empreintes SHA-1 et SHA-256 de la clé utilisée pour lancer l'app sont
-  bien enregistrées ;
-- l'ID client Web ci-dessus appartient au même projet Google que le client
-  Android.
+Si Android renvoie `sign_in_failed`, vérifiez le package et les empreintes
+SHA-1/SHA-256 du certificat qui signe l'application installée dans le projet
+Google associé au client Web. Pour le développement local, la clé debug peut
+être inspectée avec `cd android && .\\gradlew signingReport`.

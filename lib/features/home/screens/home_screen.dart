@@ -10,6 +10,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../../core/config/api_config.dart';
 import '../../../core/theme/app_theme.dart';
+import '../../quiz/screens/quiz_screen.dart' show activeQuizDraftNotifier;
 
 class HomeScreen extends ConsumerStatefulWidget {
   const HomeScreen({super.key});
@@ -75,7 +76,11 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
         final decodedDraft = jsonDecode(draft);
         if (decodedDraft is Map) {
           _activeDraft = Map<String, dynamic>.from(decodedDraft);
+          activeQuizDraftNotifier.value = _activeDraft;
         }
+      } else {
+        _activeDraft = null;
+        activeQuizDraftNotifier.value = null;
       }
       if (cached != null) {
         final data = jsonDecode(cached) as Map<String, dynamic>;
@@ -366,6 +371,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
               children: <Widget>[
                 const SizedBox(height: 16),
                 _buildHeader(),
+                const SizedBox(height: 18),
+                _buildCampaignAccess(),
                 const SizedBox(height: 20),
                 _buildModePicker(),
                 _buildResumeDraft(),
@@ -534,28 +541,88 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     );
   }
 
-  Widget _buildResumeDraft() {
-    final draft = _activeDraft;
-    if (draft == null || draft['questions'] is! List)
-      return const SizedBox.shrink();
-    final questions = (draft['questions'] as List).length;
-    final current = ((draft['current_index'] as num?)?.toInt() ?? 0) + 1;
+  Widget _buildCampaignAccess() {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 20),
-      child: Card(
-        color: const Color(0xFFFFF3E8),
-        child: ListTile(
-          leading: const Icon(Icons.play_circle_fill, color: Color(0xFFF77F00)),
-          title: const Text('Reprendre ma partie'),
-          subtitle:
-              Text('Question ${current.clamp(1, questions)} sur $questions'),
-          trailing: const Icon(Icons.chevron_right),
-          onTap: () => context.push(
-            '/quiz/${draft['category_id'] ?? 'null'}/${draft['mode'] ?? 'mixed'}',
-            extra: draft,
+      child: Material(
+        color: const Color(0xFFF77F00),
+        borderRadius: BorderRadius.circular(18),
+        child: InkWell(
+          borderRadius: BorderRadius.circular(18),
+          onTap: () => context.push('/campaign'),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 16),
+            child: Row(
+              children: [
+                Container(
+                  width: 44,
+                  height: 44,
+                  decoration: BoxDecoration(
+                    color: Colors.white.withOpacity(0.2),
+                    borderRadius: BorderRadius.circular(14),
+                  ),
+                  child: const Icon(Icons.map_rounded, color: Colors.white),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Mode Campagne',
+                        style: GoogleFonts.nunito(
+                          color: Colors.white,
+                          fontWeight: FontWeight.w900,
+                          fontSize: 16,
+                        ),
+                      ),
+                      Text(
+                        'Explore les régions et relève les niveaux',
+                        style: GoogleFonts.nunito(
+                          color: Colors.white,
+                          fontSize: 12,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const Icon(Icons.arrow_forward_rounded, color: Colors.white),
+              ],
+            ),
           ),
         ),
       ),
+    );
+  }
+
+  Widget _buildResumeDraft() {
+    return ValueListenableBuilder<Map<String, dynamic>?>(
+      valueListenable: activeQuizDraftNotifier,
+      builder: (context, draft, _) {
+        if (draft == null || draft['questions'] is! List) {
+          return const SizedBox.shrink();
+        }
+        final questions = (draft['questions'] as List).length;
+        final current = ((draft['current_index'] as num?)?.toInt() ?? 0) + 1;
+        return Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 20),
+          child: Card(
+            color: const Color(0xFFFFF3E8),
+            child: ListTile(
+              leading:
+                  const Icon(Icons.play_circle_fill, color: Color(0xFFF77F00)),
+              title: const Text('Reprendre ma partie'),
+              subtitle: Text(
+                  'Question ${current.clamp(1, questions)} sur $questions'),
+              trailing: const Icon(Icons.chevron_right),
+              onTap: () => context.push(
+                '/quiz/${draft['category_id'] ?? 'null'}/${draft['mode'] ?? 'mixed'}',
+                extra: draft,
+              ),
+            ),
+          ),
+        );
+      },
     );
   }
 

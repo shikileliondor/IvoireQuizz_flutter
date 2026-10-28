@@ -5,13 +5,13 @@ import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:share_plus/share_plus.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../../core/config/api_config.dart';
 import '../../../main.dart' show appTextScale, appHighContrast, appReduceMotion;
 
 const _orange = Color(0xFFF77F00);
-const _gold = Color(0xFFFFD700);
 const _textDark = Color(0xFF1A1A2E);
 const _textGray = Color(0xFF6B7280);
 const _cardBg = Color(0xFFF8F9FA);
@@ -34,6 +34,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
   bool _isLoading = true;
   bool _isLoggingOut = false;
   bool _accessibilityExpanded = false;
+  bool _showEmail = false;
   Future<void>? _loadDataFuture;
   static const _storage = FlutterSecureStorage();
 
@@ -137,7 +138,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
   }
 
   Future<void> _loadDataInternal() async {
-    if (mounted) {
+    if (mounted && _user == null) {
       setState(() => _isLoading = true);
     }
     try {
@@ -150,60 +151,33 @@ class _ProfileScreenState extends State<ProfileScreen> {
       }
 
       final dio = ApiConfig.createDio(authToken: token);
-
-      final results = await Future.wait([
-        dio.get('/auth/me'),
-        dio.get('/profile/stats'),
-        dio.get('/sessions'),
-        dio.get('/achievements'),
-      ]);
-
-      final userData = (results[0].data as Map<String, dynamic>)['data'];
-      final statsData = (results[1].data as Map<String, dynamic>)['data'];
-      final sessionsData = (results[2].data as Map)['data'];
-      final progressData = (results[3].data as Map)['data'];
+      final userResponse = await dio.get<dynamic>('/v1/me');
+      final dynamic userEnvelope = userResponse.data;
+      final dynamic userData =
+          userEnvelope is Map ? userEnvelope['data'] : null;
 
       if (!mounted) return;
 
       setState(() {
         if (userData is Map) {
-          if (userData.containsKey('user')) {
-            _user = Map<String, dynamic>.from(userData['user'] as Map);
-          } else {
-            _user = Map<String, dynamic>.from(userData);
-          }
-        }
-        if (statsData is Map) {
-          _stats = Map<String, dynamic>.from(statsData);
-        }
-        if (sessionsData is List) {
-          _recentSessions = sessionsData
-              .whereType<Map>()
-              .map((item) => Map<String, dynamic>.from(item))
-              .toList();
-        }
-        if (progressData is Map) {
-          final badges = progressData['badges'];
-          final objectives = progressData['objectives'];
-          if (badges is List)
-            _badges = badges
-                .whereType<Map>()
-                .map((item) => Map<String, dynamic>.from(item))
-                .toList();
-          if (objectives is List)
-            _objectives = objectives
-                .whereType<Map>()
-                .map((item) => Map<String, dynamic>.from(item))
-                .toList();
+          final dynamic rawUser =
+              userData['user'] is Map ? userData['user'] : userData;
+          _user = Map<String, dynamic>.from(rawUser as Map);
         }
         _isLoading = false;
         _loadDataFuture = null;
       });
+
+      // Render the account as soon as /me responds. Each secondary section
+      // updates the screen when its own request completes.
+      _loadStats(dio);
+      _loadRecentSessions(dio);
+      _loadAchievements(dio);
     } on DioException catch (e) {
       debugPrint('ERREUR PROFIL: $e');
       if (e.response?.statusCode == 401) {
         await _storage.delete(key: 'auth_token');
-        if (!context.mounted) return;
+        if (!mounted) return;
         context.go('/auth');
         return;
       }
@@ -222,6 +196,63 @@ class _ProfileScreenState extends State<ProfileScreen> {
     }
   }
 
+  Future<void> _loadStats(Dio dio) async {
+    final data = await _getOptionalProfileData(dio, '/profile/stats');
+    if (!mounted || data is! Map) return;
+    setState(() => _stats = Map<String, dynamic>.from(data));
+  }
+
+  Future<void> _loadRecentSessions(Dio dio) async {
+    final data = await _getOptionalProfileData(dio, '/sessions');
+    if (!mounted || data is! List) return;
+    setState(() {
+      _recentSessions = data
+          .whereType<Map>()
+          .map((item) => Map<String, dynamic>.from(item))
+          .toList();
+    });
+  }
+
+  Future<void> _loadAchievements(Dio dio) async {
+    final data = await _getOptionalProfileData(dio, '/achievements');
+    if (!mounted || data is! Map) return;
+    final badges = data['badges'];
+    final objectives = data['objectives'];
+    setState(() {
+      if (badges is List) {
+        _badges = badges
+            .whereType<Map>()
+            .map((item) => Map<String, dynamic>.from(item))
+            .toList();
+      }
+      if (objectives is List) {
+        _objectives = objectives
+            .whereType<Map>()
+            .map((item) => Map<String, dynamic>.from(item))
+            .toList();
+      }
+    });
+  }
+
+  Future<dynamic> _getOptionalProfileData(Dio dio, String path) async {
+    try {
+      final response = await dio.get<dynamic>(path);
+      final dynamic envelope = response.data;
+      return envelope is Map ? envelope['data'] : null;
+    } on DioException catch (error) {
+      if (error.response?.statusCode == 401) {
+        await _storage.delete(key: 'auth_token');
+        if (mounted) context.go('/auth');
+        return null;
+      }
+      debugPrint('Section profil indisponible ($path): $error');
+      return null;
+    } catch (error) {
+      debugPrint('Réponse profil invalide ($path): $error');
+      return null;
+    }
+  }
+
   Future<void> _logout() async {
     if (mounted) {
       setState(() => _isLoggingOut = true);
@@ -237,27 +268,53 @@ class _ProfileScreenState extends State<ProfileScreen> {
       debugPrint('LOGOUT ERROR: $e');
     } finally {
       await _storage.deleteAll();
-      if (!context.mounted) return;
-      context.go('/auth');
+      if (mounted) context.go('/auth');
     }
   }
 
-  Future<void> _copyInviteMessage() async {
+  Future<String> _getInviteMessage() async {
     try {
       final token = await _storage.read(key: 'auth_token');
-      final response =
-          await ApiConfig.createDio(authToken: token).get('/friends/invite');
-      final data = (response.data as Map)['data'] as Map;
-      await Clipboard.setData(ClipboardData(text: data['message'].toString()));
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-            content: Text('Message d’invitation copié. Partage-le à un ami.')),
+      final response = await ApiConfig.createDio(authToken: token)
+          .get<dynamic>('/friends/invite');
+      final dynamic envelope = response.data;
+      final dynamic data = envelope is Map ? envelope['data'] : null;
+      final dynamic message = data is Map ? data['message'] : null;
+      if (message is String && message.trim().isNotEmpty) return message;
+      debugPrint('Réponse /friends/invite sans message utilisable.');
+    } catch (error) {
+      debugPrint('Invitation API indisponible, partage de secours : $error');
+    }
+
+    final name = _user?['name']?.toString().trim();
+    final friendCode = _user?['friend_code']?.toString().trim();
+    final player = name == null || name.isEmpty ? 'Un joueur' : name;
+    final code =
+        friendCode == null || friendCode.isEmpty || friendCode == '------'
+            ? ''
+            : '\nMon code ami : $friendCode';
+    return 'Rejoins-moi sur IvoireQuizz, le quiz de culture ivoirienne !'
+        '\nJe suis $player.$code';
+  }
+
+  Future<void> _shareInviteMessage() async {
+    String? message;
+    try {
+      message = await _getInviteMessage();
+      await SharePlus.instance.share(
+        ShareParams(text: message, title: 'Découvre IvoireQuizz'),
       );
     } catch (_) {
       if (!mounted) return;
+      final text = message ??
+          'Rejoins-moi sur IvoireQuizz, le quiz de culture ivoirienne !';
+      await Clipboard.setData(ClipboardData(text: text));
+      if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Impossible de préparer l’invitation.')),
+        const SnackBar(
+          content: Text(
+              'Le menu de partage est indisponible. Message copié : colle-le dans WhatsApp.'),
+        ),
       );
     }
   }
@@ -275,6 +332,22 @@ class _ProfileScreenState extends State<ProfileScreen> {
     return trimmed.substring(0, trimmed.length >= 2 ? 2 : 1).toUpperCase();
   }
 
+  String _maskedEmail(String email) {
+    final parts = email.split('@');
+    if (parts.length != 2 || parts.first.isEmpty) return email;
+    final local = parts.first;
+    final visibleLength = local.length < 2 ? 1 : 2;
+    final hidden =
+        List<String>.filled(local.length - visibleLength, '•').join();
+    return '${local.substring(0, visibleLength)}$hidden@${parts.last}';
+  }
+
+  double _number(dynamic value, {double fallback = 0}) {
+    if (value is num) return value.toDouble();
+    if (value is String) return double.tryParse(value.trim()) ?? fallback;
+    return fallback;
+  }
+
   @override
   Widget build(BuildContext context) {
     if (_isLoading) {
@@ -287,220 +360,331 @@ class _ProfileScreenState extends State<ProfileScreen> {
     }
 
     final name = (_user?['name'] ?? 'Joueur').toString();
+    final email =
+        (_user?['email'] ?? 'Adresse e-mail non renseignée').toString();
     final friendCode = (_user?['friend_code'] ?? '------').toString();
-    final gamesPlayed = (_user?['games_played'] as num?)?.toInt() ?? 0;
-    final totalScore = (_user?['total_score'] as num?)?.toInt() ?? 0;
+    final level = _number(_user?['level']).toInt();
+    final gamesPlayed = _number(_user?['games_played']).toInt();
+    final totalScore = _number(_user?['total_score']).toInt();
 
-    final bestScore = (_stats?['best_score'] as num?)?.toInt() ?? 0;
-    final successRate = (_stats?['success_rate'] as num?)?.toDouble() ?? 0.0;
+    final bestScore = _number(_stats?['best_score']).toInt();
+    final successRate = _number(_stats?['success_rate']);
     final categoryStats = _stats?['by_category'] as List? ?? const [];
 
     return Scaffold(
       backgroundColor: Colors.white,
-      body: RefreshIndicator(
-        color: _orange,
-        onRefresh: _loadData,
-        child: SingleChildScrollView(
-          physics: const AlwaysScrollableScrollPhysics(),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              _accessibilitySettings(),
-              _buildHeader(name, friendCode),
-              const SizedBox(height: 24),
-              _buildStatsSection(
-                  gamesPlayed, bestScore, successRate, totalScore),
-              const SizedBox(height: 24),
-              _buildHistoryAndAchievements(),
-              const SizedBox(height: 24),
-              _buildCategoryProgress(categoryStats),
-              const SizedBox(height: 24),
-              _buildLogoutButton(),
-              const SizedBox(height: 32),
-            ],
+      body: SafeArea(
+        child: RefreshIndicator(
+          color: _orange,
+          onRefresh: _loadData,
+          child: SingleChildScrollView(
+            physics: const AlwaysScrollableScrollPhysics(),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                _buildPageHeading(),
+                _buildHeader(name, email, friendCode, level),
+                _buildStatsSection(
+                    gamesPlayed, bestScore, successRate, totalScore),
+                const SizedBox(height: 12),
+                _buildProfileActions(friendCode),
+                _buildProgressSections(categoryStats),
+                _accessibilitySettings(),
+                const SizedBox(height: 10),
+                _buildLogoutButton(),
+                const SizedBox(height: 24),
+              ],
+            ),
           ),
         ),
       ),
+    );
+  }
+
+  Widget _buildPageHeading() => Padding(
+        padding: const EdgeInsets.fromLTRB(22, 20, 18, 4),
+        child: Row(
+          children: [
+            Expanded(
+              child: Text('Mon profil',
+                  style: GoogleFonts.nunito(
+                      fontSize: 23,
+                      fontWeight: FontWeight.w900,
+                      color: _textDark)),
+            ),
+            IconButton(
+              tooltip: 'Actualiser le profil',
+              onPressed: _isLoading ? null : _loadData,
+              icon: const Icon(Icons.refresh_rounded, color: _orange),
+            ),
+          ],
+        ),
+      );
+
+  Widget _buildProfileActions(String friendCode) => Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 20),
+        child: Column(
+          children: [
+            _profileAction(
+              icon: Icons.history_rounded,
+              title: 'Historique des parties',
+              subtitle: '${_recentSessions.length} parties récentes',
+              onTap: () => context.push('/history', extra: _recentSessions),
+            ),
+            _profileAction(
+              icon: Icons.emoji_events_outlined,
+              title: 'Badges et objectifs',
+              subtitle:
+                  '${_badges.length} badges · ${_objectives.length} objectifs',
+              onTap: () => _showProfileSection(
+                'Badges et objectifs',
+                _buildHistoryAndAchievements(),
+              ),
+            ),
+            _profileAction(
+              icon: Icons.share_rounded,
+              title: 'Partager le jeu',
+              subtitle: friendCode == '------'
+                  ? 'Appuie ici puis choisis WhatsApp'
+                  : 'WhatsApp · Code ami : $friendCode',
+              onTap: _shareInviteMessage,
+            ),
+          ],
+        ),
+      );
+
+  Widget _profileAction({
+    required IconData icon,
+    required String title,
+    required String subtitle,
+    required VoidCallback onTap,
+    Widget? trailing,
+  }) =>
+      Card(
+        margin: const EdgeInsets.only(bottom: 9),
+        elevation: 0,
+        color: Colors.white,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(15),
+          side: const BorderSide(color: _neutral),
+        ),
+        child: ListTile(
+          onTap: onTap,
+          leading: CircleAvatar(
+            radius: 18,
+            backgroundColor: const Color(0xFFFFF3E8),
+            child: Icon(icon, size: 19, color: _orange),
+          ),
+          title: Text(title,
+              style: GoogleFonts.nunito(
+                  fontWeight: FontWeight.w800, color: _textDark)),
+          subtitle: Text(subtitle,
+              style: GoogleFonts.nunito(fontSize: 12, color: _textGray)),
+          trailing: trailing ?? const Icon(Icons.chevron_right_rounded),
+        ),
+      );
+
+  void _showProfileSection(String title, Widget content) {
+    showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.white,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (context) => SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(20, 18, 20, 24),
+          child: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Center(
+                  child: Container(
+                    width: 42,
+                    height: 4,
+                    decoration: BoxDecoration(
+                      color: _neutral,
+                      borderRadius: BorderRadius.circular(4),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 16),
+                Text(title,
+                    style: GoogleFonts.nunito(
+                        fontSize: 20,
+                        fontWeight: FontWeight.w900,
+                        color: _textDark)),
+                const SizedBox(height: 12),
+                content,
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildProgressSections(List categoryStats) {
+    if (categoryStats.isEmpty) return const SizedBox.shrink();
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(20, 4, 20, 4),
+      child: _profileAction(
+        icon: Icons.insights_rounded,
+        title: 'Progression par catégorie',
+        subtitle: '${categoryStats.length} catégories',
+        onTap: () => _showProfileSection(
+          'Progression par catégorie',
+          _buildCategoryProgress(categoryStats),
+        ),
+      ),
+    );
+  }
+
+  Future<void> _copyFriendCode(String friendCode) async {
+    await Clipboard.setData(ClipboardData(text: friendCode));
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Code ami copié.')),
     );
   }
 
   Widget _buildHistoryAndAchievements() {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 20),
-      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        Text('Badges et objectifs',
-            style: GoogleFonts.nunito(
-                fontSize: 18, fontWeight: FontWeight.w800, color: _textDark)),
-        const SizedBox(height: 10),
-        if (_badges.isEmpty)
-          const Text('Tes badges apparaîtront après tes premières parties.')
-        else
-          Wrap(
-              spacing: 8,
-              runSpacing: 8,
-              children: _badges.map((badge) {
-                final unlocked = badge['unlocked'] == true;
-                final progress = (badge['progress'] ?? 0).toString();
-                final target = (badge['target'] ?? 1).toString();
-                return Chip(
-                  avatar: Icon(
-                      unlocked ? Icons.emoji_events : Icons.lock_outline,
-                      size: 18,
-                      color: unlocked ? _orange : _textGray),
-                  label: Text('${badge['name'] ?? 'Badge'} $progress/$target'),
-                  backgroundColor: unlocked ? const Color(0xFFFFF3E8) : _cardBg,
-                );
-              }).toList()),
-        if (_objectives.isNotEmpty) ...[
-          const SizedBox(height: 8),
-          ..._objectives.map((item) {
-            final progress = (item['progress'] as num?)?.toDouble() ?? 0;
-            final target =
-                ((item['target'] as num?)?.toDouble() ?? 1).clamp(1, 1000);
-            return ListTile(
-              contentPadding: EdgeInsets.zero,
-              dense: true,
-              title: Text(item['name']?.toString() ?? 'Objectif'),
-              subtitle: LinearProgressIndicator(
-                  value: (progress / target).clamp(0, 1),
-                  color: _orange,
-                  backgroundColor: _neutral),
-              trailing: Text('${progress.toInt()}/${target.toInt()}'),
-            );
-          }),
-        ],
-        const SizedBox(height: 18),
-        Text('Historique récent',
-            style: GoogleFonts.nunito(
-                fontSize: 18, fontWeight: FontWeight.w800, color: _textDark)),
-        if (_recentSessions.isEmpty)
-          const Padding(
-              padding: EdgeInsets.only(top: 8),
-              child: Text('Aucune partie enregistrée.'))
-        else
-          ..._recentSessions.take(5).map((session) => ListTile(
-                contentPadding: EdgeInsets.zero,
-                leading: const CircleAvatar(
-                    backgroundColor: Color(0xFFFFF3E8),
-                    child: Icon(Icons.quiz_outlined, color: _orange)),
-                title: Text((session['category'] is Map
-                            ? session['category']['name']
-                            : null)
-                        ?.toString() ??
-                    (session['mode'] == 'daily_challenge'
-                        ? 'Questions du jour'
-                        : 'Quiz mixte')),
-                subtitle: Text(
-                    '${session['correct_answers'] ?? 0}/${session['total_questions'] ?? 10} bonnes réponses'),
-                trailing: Text(
-                    '${session['total_score'] ?? session['points_earned'] ?? 0} pts'),
-              )),
-      ]),
-    );
+    return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+      if (_badges.isEmpty)
+        const Text('Tes badges apparaîtront après tes premières parties.')
+      else
+        Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: _badges.map((badge) {
+              final unlocked = badge['unlocked'] == true;
+              final progress = (badge['progress'] ?? 0).toString();
+              final target = (badge['target'] ?? 1).toString();
+              return Chip(
+                avatar: Icon(unlocked ? Icons.emoji_events : Icons.lock_outline,
+                    size: 18, color: unlocked ? _orange : _textGray),
+                label: Text('${badge['name'] ?? 'Badge'} $progress/$target'),
+                backgroundColor: unlocked ? const Color(0xFFFFF3E8) : _cardBg,
+              );
+            }).toList()),
+      if (_objectives.isNotEmpty) ...[
+        const SizedBox(height: 8),
+        ..._objectives.map((item) {
+          final progress = _number(item['progress']);
+          final target = _number(item['target'], fallback: 1).clamp(1, 1000);
+          return ListTile(
+            contentPadding: EdgeInsets.zero,
+            dense: true,
+            title: Text(item['name']?.toString() ?? 'Objectif'),
+            subtitle: LinearProgressIndicator(
+                value: (progress / target).clamp(0, 1),
+                color: _orange,
+                backgroundColor: _neutral),
+            trailing: Text('${progress.toInt()}/${target.toInt()}'),
+          );
+        }),
+      ],
+    ]);
   }
 
-  Widget _buildHeader(String name, String friendCode) {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.fromLTRB(24, 60, 24, 32),
-      decoration: const BoxDecoration(
-        color: _orange,
-        borderRadius: BorderRadius.only(
-          bottomLeft: Radius.circular(32),
-          bottomRight: Radius.circular(32),
-        ),
-      ),
+  Widget _buildHeader(String name, String email, String friendCode, int level) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(20, 8, 20, 20),
       child: Column(
+        crossAxisAlignment: CrossAxisAlignment.center,
         children: [
-          Container(
-            width: 80,
-            height: 80,
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              color: Colors.white.withValues(alpha: 0.2),
-              border: Border.all(color: Colors.white, width: 3),
-            ),
-            child: Center(
-              child: Text(
-                _getInitials(name),
-                style: GoogleFonts.nunito(
-                  fontSize: 28,
-                  fontWeight: FontWeight.w800,
-                  color: Colors.white,
-                ),
-              ),
-            ),
-          ),
-          const SizedBox(height: 12),
-          Text(
-            name,
-            style: GoogleFonts.nunito(
-              fontSize: 22,
-              fontWeight: FontWeight.w800,
-              color: Colors.white,
+          CircleAvatar(
+            radius: 39,
+            backgroundColor: const Color(0xFFFFF3E8),
+            child: Text(
+              _getInitials(name),
+              style: GoogleFonts.nunito(
+                  fontSize: 25, fontWeight: FontWeight.w900, color: _orange),
             ),
           ),
           const SizedBox(height: 8),
-          GestureDetector(
-            onTap: () {
-              Clipboard.setData(ClipboardData(text: friendCode));
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(
-                  content: Text(
-                    'Code copié !',
-                    style: GoogleFonts.nunito(),
+          Text(name,
+              textAlign: TextAlign.center,
+              style: GoogleFonts.nunito(
+                  fontSize: 21, fontWeight: FontWeight.w900, color: _textDark)),
+          const SizedBox(height: 2),
+          ConstrainedBox(
+            constraints: BoxConstraints(
+              maxWidth: MediaQuery.sizeOf(context).width - 72,
+            ),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Flexible(
+                  child: Text(
+                    _showEmail ? email : _maskedEmail(email),
+                    textAlign: TextAlign.center,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: GoogleFonts.nunito(
+                      fontSize: 12,
+                      color: _textGray.withValues(alpha: .75),
+                    ),
                   ),
-                  backgroundColor: _textDark,
-                  duration: const Duration(seconds: 2),
                 ),
-              );
-            },
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-              decoration: BoxDecoration(
-                color: Colors.white.withValues(alpha: 0.2),
-                borderRadius: BorderRadius.circular(20),
-                border: Border.all(color: Colors.white.withValues(alpha: 0.4)),
-              ),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Text(
-                    'Code : ',
-                    style: GoogleFonts.nunito(
-                      fontSize: 13,
-                      color: Colors.white70,
-                    ),
-                  ),
-                  Text(
-                    friendCode,
-                    style: GoogleFonts.nunito(
-                      fontSize: 14,
-                      fontWeight: FontWeight.w800,
-                      color: _gold,
-                      letterSpacing: 2,
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                  const Icon(
-                    Icons.copy_rounded,
-                    color: Colors.white70,
+                IconButton(
+                  tooltip: _showEmail
+                      ? 'Masquer l’adresse e-mail'
+                      : 'Afficher l’adresse e-mail',
+                  visualDensity: VisualDensity.compact,
+                  constraints:
+                      const BoxConstraints.tightFor(width: 30, height: 30),
+                  padding: EdgeInsets.zero,
+                  onPressed: () => setState(() => _showEmail = !_showEmail),
+                  icon: Icon(
+                    _showEmail
+                        ? Icons.visibility_off_outlined
+                        : Icons.visibility_outlined,
                     size: 16,
+                    color: _textGray,
                   ),
-                ],
-              ),
+                ),
+              ],
             ),
           ),
-          TextButton.icon(
-            onPressed: _copyInviteMessage,
-            icon: const Icon(Icons.person_add_alt_1,
-                color: Colors.white, size: 18),
-            label: const Text('Copier mon invitation',
-                style: TextStyle(color: Colors.white)),
+          const SizedBox(height: 6),
+          Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Icon(Icons.workspace_premium_outlined,
+                  size: 16, color: _orange),
+              const SizedBox(width: 4),
+              Text('Niveau $level',
+                  style: GoogleFonts.nunito(
+                      color: _orange, fontWeight: FontWeight.w800)),
+              const SizedBox(width: 10),
+              InkWell(
+                borderRadius: BorderRadius.circular(12),
+                onTap: () => _copyFriendCode(friendCode),
+                child: Padding(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
+                  child: Row(
+                    children: [
+                      const Icon(Icons.copy_rounded,
+                          size: 13, color: _textGray),
+                      const SizedBox(width: 4),
+                      Text('Code $friendCode',
+                          style: GoogleFonts.nunito(
+                              fontSize: 12,
+                              color: _textGray,
+                              fontWeight: FontWeight.w700)),
+                    ],
+                  ),
+                ),
+              ),
+            ],
           ),
         ],
       ),
-    ).animate().fadeIn(duration: 500.ms).slideY(begin: -0.1);
+    ).animate().fadeIn(duration: 400.ms).slideY(begin: .05);
   }
 
   Widget _buildStatsSection(
@@ -511,180 +695,119 @@ class _ProfileScreenState extends State<ProfileScreen> {
   ) {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 20),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            'Statistiques',
-            style: GoogleFonts.nunito(
-              fontSize: 18,
-              fontWeight: FontWeight.w700,
-              color: _textDark,
+      child: Container(
+        padding: const EdgeInsets.fromLTRB(16, 14, 16, 16),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(18),
+          border: Border.all(color: _neutral),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('Statistiques de jeu',
+                style: GoogleFonts.nunito(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w900,
+                    color: _textDark)),
+            const SizedBox(height: 12),
+            Row(
+              children: [
+                Expanded(child: _buildCompactStat('Parties', '$gamesPlayed')),
+                Expanded(
+                    child: _buildCompactStat('Meilleur score', '$bestScore')),
+                Expanded(
+                    child: _buildCompactStat(
+                        'Réussite', '${successRate.toStringAsFixed(0)}%')),
+                Expanded(
+                    child: _buildCompactStat('Score total', '$totalScore')),
+              ],
             ),
-          ),
-          const SizedBox(height: 12),
-          Row(
-            children: [
-              Expanded(
-                child: _buildStatCard(
-                  label: 'Parties jouées',
-                  value: '$gamesPlayed',
-                  isGold: false,
-                ),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: _buildStatCard(
-                  label: 'Meilleur score',
-                  value: '$bestScore',
-                  isGold: true,
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 12),
-          Row(
-            children: [
-              Expanded(
-                child: _buildStatCard(
-                  label: 'Taux de réussite',
-                  value: '${successRate.toStringAsFixed(0)}%',
-                  isGold: false,
-                ),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: _buildStatCard(
-                  label: 'Score total',
-                  value: '$totalScore',
-                  isGold: true,
-                ),
-              ),
-            ],
-          ),
-        ],
-      ),
-    )
-        .animate()
-        .fadeIn(duration: 400.ms, delay: 200.ms)
-        .slideY(begin: 0.1, delay: 200.ms);
-  }
-
-  Widget _buildStatCard({
-    required String label,
-    required String value,
-    required bool isGold,
-  }) {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: isGold ? const Color(0xFFFFFDE8) : _cardBg,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(
-          color: isGold ? const Color(0xFFFFE082) : _neutral,
+          ],
         ),
       ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            value,
-            style: GoogleFonts.nunito(
-              fontSize: 28,
-              fontWeight: FontWeight.w800,
-              color: isGold ? _gold : _textDark,
-            ),
-          ),
-          const SizedBox(height: 4),
-          Text(
-            label,
-            style: GoogleFonts.nunito(
-              fontSize: 12,
-              color: _textGray,
-            ),
-          ),
-        ],
-      ),
-    );
+    ).animate().fadeIn(duration: 350.ms, delay: 100.ms);
   }
+
+  Widget _buildCompactStat(String label, String value) => Padding(
+        padding: const EdgeInsets.only(right: 5),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(value,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: GoogleFonts.nunito(
+                    fontSize: 18, fontWeight: FontWeight.w900, color: _orange)),
+            Text(label,
+                maxLines: 2,
+                style: GoogleFonts.nunito(fontSize: 10, color: _textGray)),
+          ],
+        ),
+      );
 
   Widget _buildCategoryProgress(List categoryStats) {
     if (categoryStats.isEmpty) {
       return const SizedBox.shrink();
     }
 
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 20),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            'Progression par catégorie',
-            style: GoogleFonts.nunito(
-              fontSize: 18,
-              fontWeight: FontWeight.w700,
-              color: _textDark,
-            ),
-          ),
-          const SizedBox(height: 16),
-          ...categoryStats.asMap().entries.map((entry) {
-            final i = entry.key;
-            final stat = entry.value as Map<String, dynamic>;
-            final categoryName =
-                (stat['category_name'] ?? stat['name'] ?? '').toString();
-            final rawRate =
-                (stat['success_rate'] ?? stat['rate'] ?? 0.0) as num;
-            final rate = rawRate.toDouble();
-            final normalizedRate =
-                (rate > 1 ? rate / 100 : rate).clamp(0.0, 1.0);
-            final percent = (normalizedRate * 100).toStringAsFixed(0);
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        ...categoryStats.asMap().entries.map((entry) {
+          final i = entry.key;
+          final stat = entry.value as Map<String, dynamic>;
+          final categoryName =
+              (stat['category_name'] ?? stat['name'] ?? '').toString();
+          final rate = _number(stat['success_rate'] ?? stat['rate']);
+          final normalizedRate = (rate > 1 ? rate / 100 : rate).clamp(0.0, 1.0);
+          final percent = (normalizedRate * 100).toStringAsFixed(0);
 
-            return Padding(
-              padding: const EdgeInsets.only(bottom: 16),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Text(
-                        categoryName,
-                        style: GoogleFonts.nunito(
-                          fontSize: 14,
-                          fontWeight: FontWeight.w600,
-                          color: _textDark,
-                        ),
+          return Padding(
+            padding: const EdgeInsets.only(bottom: 16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text(
+                      categoryName,
+                      style: GoogleFonts.nunito(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w600,
+                        color: _textDark,
                       ),
-                      Text(
-                        '$percent%',
-                        style: GoogleFonts.nunito(
-                          fontSize: 14,
-                          fontWeight: FontWeight.w700,
-                          color: _orange,
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 8),
-                  ClipRRect(
-                    borderRadius: BorderRadius.circular(4),
-                    child: LinearProgressIndicator(
-                      value: normalizedRate,
-                      backgroundColor: _neutral,
-                      valueColor: const AlwaysStoppedAnimation(_orange),
-                      minHeight: 8,
                     ),
+                    Text(
+                      '$percent%',
+                      style: GoogleFonts.nunito(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w700,
+                        color: _orange,
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 8),
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(4),
+                  child: LinearProgressIndicator(
+                    value: normalizedRate,
+                    backgroundColor: _neutral,
+                    valueColor: const AlwaysStoppedAnimation(_orange),
+                    minHeight: 8,
                   ),
-                ],
-              )
-                  .animate()
-                  .fadeIn(
-                      duration: 400.ms, delay: Duration(milliseconds: 100 * i))
-                  .slideX(begin: 0.1, delay: Duration(milliseconds: 100 * i)),
-            );
-          }).toList(),
-        ],
-      ),
+                ),
+              ],
+            )
+                .animate()
+                .fadeIn(
+                    duration: 400.ms, delay: Duration(milliseconds: 100 * i))
+                .slideX(begin: 0.1, delay: Duration(milliseconds: 100 * i)),
+          );
+        }),
+      ],
     );
   }
 

@@ -115,17 +115,14 @@ class _AuthScreenState extends State<AuthScreen>
     }
     if (_registerPasswordController.text.length < 8) {
       setState(() {
-        _errorMessage =
-            'Le mot de passe doit contenir au moins 8 caractères';
+        _errorMessage = 'Le mot de passe doit contenir au moins 8 caractères';
         _isLoading = false;
       });
       return;
     }
-    if (_registerPasswordController.text !=
-        _confirmPasswordController.text) {
+    if (_registerPasswordController.text != _confirmPasswordController.text) {
       setState(() {
-        _errorMessage =
-            'Les mots de passe ne correspondent pas';
+        _errorMessage = 'Les mots de passe ne correspondent pas';
         _isLoading = false;
       });
       return;
@@ -139,8 +136,7 @@ class _AuthScreenState extends State<AuthScreen>
           'name': _nameController.text.trim(),
           'email': _registerEmailController.text.trim(),
           'password': _registerPasswordController.text,
-          'password_confirmation':
-              _confirmPasswordController.text,
+          'password_confirmation': _confirmPasswordController.text,
         },
       );
 
@@ -179,8 +175,7 @@ class _AuthScreenState extends State<AuthScreen>
     }
     if (_loginPasswordController.text.isEmpty) {
       setState(() {
-        _errorMessage =
-            'Veuillez entrer votre mot de passe';
+        _errorMessage = 'Veuillez entrer votre mot de passe';
         _isLoading = false;
       });
       return;
@@ -202,8 +197,7 @@ class _AuthScreenState extends State<AuthScreen>
         if (mounted) context.go('/home');
       }
     } on DioException catch (e) {
-      String message =
-          'Email ou mot de passe incorrect';
+      String message = 'Email ou mot de passe incorrect';
       if (e.response?.data?['message'] != null) {
         message = e.response!.data['message'];
       }
@@ -220,49 +214,100 @@ class _AuthScreenState extends State<AuthScreen>
     });
 
     try {
-      final googleSignIn = GoogleSignIn(
-        scopes: const <String>['email', 'profile'],
-        serverClientId: _googleWebClientId,
-      );
-      final account = await googleSignIn.signIn();
-      if (account == null) {
-        setState(() => _isLoading = false);
-        return;
-      }
-      final auth = await account.authentication;
-      final idToken = auth.idToken;
-      if (idToken == null) {
+      final String? webClientId = _googleWebClientId;
+      if (webClientId == null) {
         setState(() {
-          _errorMessage = _missingGoogleIdTokenMessage;
-          _isLoading = false;
+          _errorMessage = 'Google Sign-In n’est pas configuré. Relancez '
+              'l’application avec GOOGLE_WEB_CLIENT_ID défini sur votre ID '
+              'client Web OAuth.';
         });
         return;
       }
 
-      final dio = _createDio();
-      final response = await dio.post(
-        '/auth/google',
-        data: {'token': idToken},
+      final googleSignIn = GoogleSignIn(
+        scopes: const <String>['email', 'profile'],
+        serverClientId: webClientId,
+      );
+      // Clear the cached Google account so the user can choose an account
+      // instead of silently reusing the previously selected one.
+      await googleSignIn.signOut();
+      final account = await googleSignIn.signIn();
+      if (account == null) return;
+
+      final auth = await account.authentication;
+      final String? idToken = auth.idToken;
+      if (idToken == null || idToken.isEmpty) {
+        setState(() => _errorMessage = _missingGoogleIdTokenMessage);
+        return;
+      }
+
+      final response = await _createDio().post<dynamic>(
+        '${ApiConfig.baseUrl.replaceFirst(RegExp(r"/+$"), '')}/api/v1/auth/google',
+        data: <String, String>{'id_token': idToken},
+        options: Options(
+          headers: const <String, String>{
+            'Accept': 'application/json',
+            'Content-Type': 'application/json',
+          },
+        ),
       );
 
-      if (response.statusCode == 200) {
-        final token = response.data['data']['token'];
-        await _storage.write(key: 'auth_token', value: token);
-        if (mounted) context.go('/home');
+      final dynamic responseData = response.data;
+      final dynamic data = responseData is Map ? responseData['data'] : null;
+      final dynamic token = data is Map ? data['token'] : null;
+      final dynamic tokenType = data is Map ? data['token_type'] : null;
+      if (response.statusCode != 200 ||
+          responseData is! Map ||
+          responseData['success'] != true ||
+          token is! String ||
+          token.isEmpty ||
+          tokenType is! String ||
+          tokenType.toLowerCase() != 'bearer') {
+        setState(() => _errorMessage =
+            'La réponse du serveur est invalide. Réessayez plus tard.');
+        return;
       }
+
+      await _storage.write(key: 'auth_token', value: token);
+      if (mounted) context.go('/home');
     } on DioException catch (e) {
-      String message = 'Erreur de connexion Google';
-      if (e.response?.data?['message'] != null) {
-        message = e.response!.data['message'];
-      }
-      setState(() => _errorMessage = message);
+      setState(() => _errorMessage = _googleApiErrorMessage(e));
     } on PlatformException catch (e) {
       setState(() => _errorMessage = _googlePlatformErrorMessage(e));
-    } catch (e) {
-      setState(() => _errorMessage = 'Erreur Google Sign In');
+    } catch (_) {
+      setState(() => _errorMessage = 'Erreur Google Sign-In inattendue.');
     } finally {
-      setState(() => _isLoading = false);
+      if (mounted) setState(() => _isLoading = false);
     }
+  }
+
+  String _googleApiErrorMessage(DioException error) {
+    final int? statusCode = error.response?.statusCode;
+    final dynamic responseData = error.response?.data;
+    final dynamic serverMessage =
+        responseData is Map ? responseData['message'] : null;
+
+    if (serverMessage is String && serverMessage.trim().isNotEmpty) {
+      return serverMessage;
+    }
+    if (statusCode == 401 || statusCode == 422) {
+      return 'Google n’a pas pu authentifier ce compte. Vérifiez la '
+          'configuration OAuth puis réessayez.';
+    }
+    if (statusCode == 403) {
+      return 'Ce compte Google n’est pas autorisé à se connecter.';
+    }
+    if (statusCode != null && statusCode >= 500) {
+      return 'Le service de connexion est temporairement indisponible.';
+    }
+    if (error.type == DioExceptionType.connectionTimeout ||
+        error.type == DioExceptionType.receiveTimeout ||
+        error.type == DioExceptionType.sendTimeout ||
+        error.type == DioExceptionType.connectionError) {
+      return 'Impossible de joindre le serveur. Vérifiez votre connexion '
+          'internet puis réessayez.';
+    }
+    return 'La connexion à IvoireQuizz a échoué. Réessayez.';
   }
 
   @override
@@ -289,10 +334,12 @@ class _AuthScreenState extends State<AuthScreen>
                         height: 80,
                         decoration: BoxDecoration(
                           color: const Color(0xFFF77F00),
-                          borderRadius: const BorderRadius.all(Radius.circular(14)),
+                          borderRadius:
+                              const BorderRadius.all(Radius.circular(14)),
                         ),
                         child: ClipRRect(
-                          borderRadius: const BorderRadius.all(Radius.circular(14)),
+                          borderRadius:
+                              const BorderRadius.all(Radius.circular(14)),
                           child: Image.asset(
                             'assets/avecfodn.jpeg',
                             fit: BoxFit.cover,
@@ -340,7 +387,8 @@ class _AuthScreenState extends State<AuthScreen>
                       controller: _tabController,
                       indicator: BoxDecoration(
                         color: const Color(0xFFF77F00),
-                        borderRadius: const BorderRadius.all(Radius.circular(12)),
+                        borderRadius:
+                            const BorderRadius.all(Radius.circular(12)),
                       ),
                       indicatorSize: TabBarIndicatorSize.tab,
                       dividerColor: Colors.transparent,

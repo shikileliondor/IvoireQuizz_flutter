@@ -4,6 +4,7 @@ import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../features/auth/screens/auth_screen.dart';
+import '../../features/campaign/screens/campaign_map_screen.dart';
 import '../../features/friends/screens/friends_screen.dart';
 import '../../features/home/screens/all_categories_screen.dart';
 import '../../features/home/screens/home_screen.dart';
@@ -11,6 +12,7 @@ import '../../features/leaderboard/screens/leaderboard_screen.dart';
 import '../../features/onboarding/screens/ivoire_quiz_splash_screen.dart';
 import '../../features/onboarding/screens/onboarding_screen.dart';
 import '../../features/profile/screens/profile_screen.dart';
+import '../../features/profile/screens/history_screen.dart';
 import '../../features/quiz/screens/quiz_screen.dart';
 import '../../features/result/screens/result_screen.dart';
 import '../theme/app_theme.dart';
@@ -111,6 +113,50 @@ final Provider<GoRouter> routerProvider = Provider<GoRouter>((Ref ref) {
             ],
           ),
         ],
+      ),
+      GoRoute(
+        path: '/history',
+        builder: (BuildContext context, GoRouterState state) {
+          final extra = state.extra;
+          final sessions = extra is List
+              ? extra
+                  .whereType<Map>()
+                  .map((item) => Map<String, dynamic>.from(item))
+                  .toList()
+              : <Map<String, dynamic>>[];
+          return HistoryScreen(sessions: sessions);
+        },
+      ),
+      GoRoute(
+        path: '/campaign',
+        builder: (BuildContext context, GoRouterState state) =>
+            const CampaignMapScreen(),
+      ),
+      GoRoute(
+        path: '/campaign/quiz',
+        builder: (BuildContext context, GoRouterState state) {
+          final dynamic extra = state.extra;
+          final Map<String, dynamic> payload = extra is Map
+              ? Map<String, dynamic>.from(extra)
+              : <String, dynamic>{};
+          final dynamic rawQuestions = payload['questions'];
+          final questions = rawQuestions is List
+              ? rawQuestions
+                  .whereType<Map>()
+                  .map((Map item) => Map<String, dynamic>.from(item))
+                  .toList()
+              : <Map<String, dynamic>>[];
+          final dynamic rawLevel = payload['level'];
+          return QuizScreen(
+            mode: 'campaign',
+            campaignSessionId: int.tryParse(
+              payload['session_id']?.toString() ?? '',
+            ),
+            campaignLevel:
+                rawLevel is Map ? Map<String, dynamic>.from(rawLevel) : null,
+            campaignQuestions: questions,
+          );
+        },
       ),
       GoRoute(
         path: '/challenge/:code',

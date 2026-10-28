@@ -27,20 +27,38 @@ class _LeaderboardScreenState extends State<LeaderboardScreen>
     with SingleTickerProviderStateMixin {
   late TabController _tabController;
   List<Map<String, dynamic>> _globalList = <Map<String, dynamic>>[];
+  List<Map<String, dynamic>> _weeklyList = <Map<String, dynamic>>[];
   List<Map<String, dynamic>> _friendsList = <Map<String, dynamic>>[];
   int? _currentUserId;
   int? _currentUserRank;
+  int? _weeklyUserRank;
+  int? _currentScore;
+  int? _weeklyPoints;
+  String? _weekStart;
+  String? _weekEnd;
+  String? _globalError;
+  String? _weeklyError;
+  int _globalPage = 1;
+  int _globalLastPage = 1;
+  int _weeklyPage = 1;
+  int _weeklyLastPage = 1;
   bool _isLoadingGlobal = true;
+  bool _isLoadingWeekly = false;
+  bool _isLoadingMoreGlobal = false;
+  bool _isLoadingMoreWeekly = false;
   bool _isLoadingFriends = false;
   Future<void>? _currentUserLoadFuture;
   Future<void>? _globalLoadFuture;
+  Future<void>? _weeklyLoadFuture;
+  Future<void>? _globalMoreLoadFuture;
+  Future<void>? _weeklyMoreLoadFuture;
   Future<void>? _friendsLoadFuture;
   static const _storage = FlutterSecureStorage();
 
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 2, vsync: this);
+    _tabController = TabController(length: 3, vsync: this);
     _loadCurrentUser();
     _loadGlobal();
     _tabController.addListener(_handleTabChanged);
@@ -51,6 +69,9 @@ class _LeaderboardScreenState extends State<LeaderboardScreen>
     _tabController.removeListener(_handleTabChanged);
     _currentUserLoadFuture = null;
     _globalLoadFuture = null;
+    _weeklyLoadFuture = null;
+    _globalMoreLoadFuture = null;
+    _weeklyMoreLoadFuture = null;
     _friendsLoadFuture = null;
     _tabController.dispose();
     super.dispose();
@@ -58,7 +79,15 @@ class _LeaderboardScreenState extends State<LeaderboardScreen>
 
   void _handleTabChanged() {
     if (!mounted) return;
-    if (_tabController.index == 1 && _friendsList.isEmpty && !_isLoadingFriends) {
+    setState(() {});
+    if (_tabController.index == 1 &&
+        _weeklyList.isEmpty &&
+        !_isLoadingWeekly &&
+        _weeklyError == null) {
+      _loadWeekly();
+    } else if (_tabController.index == 2 &&
+        _friendsList.isEmpty &&
+        !_isLoadingFriends) {
       _loadFriends();
     }
   }
@@ -85,10 +114,12 @@ class _LeaderboardScreenState extends State<LeaderboardScreen>
       final Response<dynamic> response = await dio.get<dynamic>('/auth/me');
       if (!mounted) return;
       final dynamic data = response.data;
-      final dynamic userData = data is Map<String, dynamic> ? data['data'] : null;
+      final dynamic userData =
+          data is Map<String, dynamic> ? data['data'] : null;
 
       if (userData is Map) {
-        final dynamic user = userData.containsKey('user') ? userData['user'] : userData;
+        final dynamic user =
+            userData.containsKey('user') ? userData['user'] : userData;
 
         if (user is Map && user['id'] != null) {
           final int? id = int.tryParse(user['id'].toString());
@@ -110,49 +141,193 @@ class _LeaderboardScreenState extends State<LeaderboardScreen>
     final Future<void>? runningLoad = _globalLoadFuture;
     if (runningLoad != null) return runningLoad;
 
-    final Future<void> load = _loadGlobalInternal();
+    final Future<void> load = _loadGlobalPage(page: 1, append: false);
     _globalLoadFuture = load;
     return load;
   }
 
-  Future<void> _loadGlobalInternal() async {
+  Future<void> _loadGlobalPage(
+      {required int page, required bool append}) async {
     if (mounted) {
-      setState(() => _isLoadingGlobal = true);
+      setState(() {
+        if (append) {
+          _isLoadingMoreGlobal = true;
+        } else {
+          _isLoadingGlobal = true;
+          _globalError = null;
+          if (!append) _globalPage = 1;
+        }
+      });
     }
-
     try {
       final Dio dio = await _createDio();
       if (!mounted) return;
 
-      final Response<dynamic> response = await dio.get<dynamic>('/leaderboard/global');
-      if (!mounted) return;
-      final dynamic payload = response.data;
-      final List<Map<String, dynamic>> users = _extractLeaderboardUsers(
-        payload,
-        preferredKeys: const <String>[
-          'leaderboard',
-          'rankings',
-          'users',
-          'players',
-        ],
+      final Response<dynamic> response = await dio.get<dynamic>(
+        '/leaderboard/global',
+        queryParameters: <String, dynamic>{'page': page},
       );
-      final int? rank = _extractCurrentUserRank(payload);
-
       if (!mounted) return;
+      final parsed = _parseLeaderboardPage(response.data, requestedPage: page);
+      final Map<String, dynamic> data = parsed['data'] as Map<String, dynamic>;
+
       setState(() {
-        _globalList = _sortByScore(users);
-        _currentUserRank = rank;
+        _globalList = append
+            ? <Map<String, dynamic>>[
+                ..._globalList,
+                ...parsed['users'] as List<Map<String, dynamic>>
+              ]
+            : parsed['users'] as List<Map<String, dynamic>>;
+        _globalPage = parsed['current_page'] as int;
+        _globalLastPage = parsed['last_page'] as int;
+        _currentUserRank = _readInt(data['current_user_rank']);
+        _currentScore = _readInt(data['current_score']);
+        _globalError = null;
         _isLoadingGlobal = false;
+        _isLoadingMoreGlobal = false;
         _globalLoadFuture = null;
+        _globalMoreLoadFuture = null;
       });
     } catch (e) {
       debugPrint('GLOBAL ERROR: $e');
       if (!mounted) return;
       setState(() {
+        _globalError = 'Impossible de charger le classement général.';
         _isLoadingGlobal = false;
+        _isLoadingMoreGlobal = false;
         _globalLoadFuture = null;
+        _globalMoreLoadFuture = null;
       });
     }
+  }
+
+  Future<void> _loadGlobalMore() {
+    final Future<void>? runningLoad = _globalMoreLoadFuture;
+    if (runningLoad != null) return runningLoad;
+    final Future<void> load =
+        _loadGlobalPage(page: _globalPage + 1, append: true);
+    _globalMoreLoadFuture = load;
+    return load;
+  }
+
+  Future<void> _loadWeekly() {
+    final Future<void>? runningLoad = _weeklyLoadFuture;
+    if (runningLoad != null) return runningLoad;
+    final Future<void> load = _loadWeeklyPage(page: 1, append: false);
+    _weeklyLoadFuture = load;
+    return load;
+  }
+
+  Future<void> _loadWeeklyPage(
+      {required int page, required bool append}) async {
+    if (mounted) {
+      setState(() {
+        if (append) {
+          _isLoadingMoreWeekly = true;
+        } else {
+          _isLoadingWeekly = true;
+          _weeklyError = null;
+          _weeklyPage = 1;
+          _weeklyUserRank = null;
+        }
+      });
+    }
+    try {
+      final Dio dio = await _createDio();
+      if (!mounted) return;
+      final Response<dynamic> response = await dio.get<dynamic>(
+        '/leaderboard/weekly',
+        queryParameters: <String, dynamic>{'page': page},
+      );
+      if (!mounted) return;
+      final parsed = _parseLeaderboardPage(response.data, requestedPage: page);
+      final Map<String, dynamic> data = parsed['data'] as Map<String, dynamic>;
+      setState(() {
+        _weeklyList = append
+            ? <Map<String, dynamic>>[
+                ..._weeklyList,
+                ...parsed['users'] as List<Map<String, dynamic>>
+              ]
+            : parsed['users'] as List<Map<String, dynamic>>;
+        _weeklyPage = parsed['current_page'] as int;
+        _weeklyLastPage = parsed['last_page'] as int;
+        _weeklyUserRank = _readInt(data['current_user_rank']);
+        _weeklyPoints = _readInt(data['weekly_points']);
+        _weekStart = data['week_start']?.toString();
+        _weekEnd = data['week_end']?.toString();
+        _weeklyError = null;
+        _isLoadingWeekly = false;
+        _isLoadingMoreWeekly = false;
+        _weeklyLoadFuture = null;
+        _weeklyMoreLoadFuture = null;
+      });
+    } catch (e) {
+      debugPrint('WEEKLY LEADERBOARD ERROR: $e');
+      if (!mounted) return;
+      setState(() {
+        _weeklyError = 'Impossible de charger le classement hebdomadaire.';
+        _isLoadingWeekly = false;
+        _isLoadingMoreWeekly = false;
+        _weeklyLoadFuture = null;
+        _weeklyMoreLoadFuture = null;
+      });
+    }
+  }
+
+  Future<void> _loadWeeklyMore() {
+    final Future<void>? runningLoad = _weeklyMoreLoadFuture;
+    if (runningLoad != null) return runningLoad;
+    final Future<void> load =
+        _loadWeeklyPage(page: _weeklyPage + 1, append: true);
+    _weeklyMoreLoadFuture = load;
+    return load;
+  }
+
+  int? _readInt(dynamic value) {
+    if (value is int) return value;
+    if (value is num) return value.toInt();
+    return int.tryParse(value?.toString() ?? '');
+  }
+
+  Map<String, dynamic> _parseLeaderboardPage(
+    dynamic response, {
+    required int requestedPage,
+  }) {
+    if (response is! Map) {
+      throw const FormatException('Réponse de classement invalide.');
+    }
+    final Map<String, dynamic> envelope = _normalizeMap(response);
+    final dynamic rawData = envelope['data'];
+    if (rawData is! Map) {
+      throw const FormatException('Données de classement absentes.');
+    }
+    final Map<String, dynamic> data = _normalizeMap(rawData);
+    final dynamic rawLeaderboard = data['leaderboard'];
+    dynamic rawRows;
+    Map<String, dynamic> pagination = <String, dynamic>{};
+    if (rawLeaderboard is Map) {
+      final Map<String, dynamic> leaderboard = _normalizeMap(rawLeaderboard);
+      rawRows = leaderboard['data'];
+      final dynamic meta = leaderboard['meta'];
+      pagination = meta is Map ? _normalizeMap(meta) : leaderboard;
+    } else if (rawLeaderboard is List) {
+      rawRows = rawLeaderboard;
+    }
+    if (rawRows is! List) {
+      throw const FormatException('Liste de classement absente.');
+    }
+
+    final users = rawRows
+        .whereType<Map>()
+        .map((Map<dynamic, dynamic> item) => _normalizeLeaderboardUser(item))
+        .where((Map<String, dynamic> user) => user.isNotEmpty)
+        .toList();
+    return <String, dynamic>{
+      'data': data,
+      'users': users,
+      'current_page': _readInt(pagination['current_page']) ?? requestedPage,
+      'last_page': _readInt(pagination['last_page']) ?? requestedPage,
+    };
   }
 
   Future<void> _loadFriends() {
@@ -173,7 +348,8 @@ class _LeaderboardScreenState extends State<LeaderboardScreen>
       final Dio dio = await _createDio();
       if (!mounted) return;
 
-      final List<Map<String, dynamic>> friends = await _fetchFriendsRanking(dio);
+      final List<Map<String, dynamic>> friends =
+          await _fetchFriendsRanking(dio);
       if (!mounted) return;
       setState(() {
         _friendsList = _sortByScore(friends);
@@ -194,7 +370,8 @@ class _LeaderboardScreenState extends State<LeaderboardScreen>
     try {
       final Response<dynamic> leaderboardResponse =
           await dio.get<dynamic>('/leaderboard/friends');
-      final List<Map<String, dynamic>> leaderboardUsers = _extractLeaderboardUsers(
+      final List<Map<String, dynamic>> leaderboardUsers =
+          _extractLeaderboardUsers(
         leaderboardResponse.data,
         preferredKeys: const <String>[
           'leaderboard',
@@ -212,7 +389,8 @@ class _LeaderboardScreenState extends State<LeaderboardScreen>
       debugPrint('FRIENDS LEADERBOARD ERROR: $e');
     }
 
-    final Response<dynamic> friendsResponse = await dio.get<dynamic>('/friends');
+    final Response<dynamic> friendsResponse =
+        await dio.get<dynamic>('/friends');
     return _extractLeaderboardUsers(
       friendsResponse.data,
       preferredKeys: const <String>['friends'],
@@ -262,7 +440,8 @@ class _LeaderboardScreenState extends State<LeaderboardScreen>
     return null;
   }
 
-  Map<String, dynamic> _normalizeLeaderboardUser(Map<dynamic, dynamic> rawItem) {
+  Map<String, dynamic> _normalizeLeaderboardUser(
+      Map<dynamic, dynamic> rawItem) {
     final Map<String, dynamic> item = _normalizeMap(rawItem);
     final Map<String, dynamic> nestedUser = _extractNestedUser(item);
     final Map<String, dynamic> user = <String, dynamic>{
@@ -274,11 +453,15 @@ class _LeaderboardScreenState extends State<LeaderboardScreen>
     if (score > 0) {
       user['total_score'] = score;
     } else {
-      user['total_score'] =
-          user['total_score'] ?? user['score'] ?? item['total_score'] ?? item['score'] ?? 0;
+      user['total_score'] = user['total_score'] ??
+          user['score'] ??
+          item['total_score'] ??
+          item['score'] ??
+          0;
     }
 
-    user['id'] = user['id'] ?? item['user_id'] ?? item['friend_id'] ?? item['id'];
+    user['id'] =
+        user['id'] ?? item['user_id'] ?? item['friend_id'] ?? item['id'];
     user['name'] = _extractName(user, fallback: _extractName(item));
     user['rank'] = user['rank'] ?? item['rank'] ?? item['position'];
     return user;
@@ -320,7 +503,9 @@ class _LeaderboardScreenState extends State<LeaderboardScreen>
       final int scoreCompare = _extractScore(b).compareTo(_extractScore(a));
       if (scoreCompare != 0) return scoreCompare;
 
-      return _extractName(a).toLowerCase().compareTo(_extractName(b).toLowerCase());
+      return _extractName(a)
+          .toLowerCase()
+          .compareTo(_extractName(b).toLowerCase());
     });
 
     return sorted;
@@ -361,29 +546,6 @@ class _LeaderboardScreenState extends State<LeaderboardScreen>
     return fallback;
   }
 
-  int? _extractCurrentUserRank(dynamic payload) {
-    if (payload is! Map) return null;
-
-    final Map<String, dynamic> normalized = _normalizeMap(payload);
-    for (final String key in const <String>[
-      'current_user_rank',
-      'currentUserRank',
-      'my_rank',
-      'rank',
-      'position',
-    ]) {
-      final int? rank = int.tryParse((normalized[key] ?? '').toString());
-      if (rank != null) return rank;
-    }
-
-    final dynamic data = normalized['data'];
-    if (data is Map) {
-      return _extractCurrentUserRank(data);
-    }
-
-    return null;
-  }
-
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -397,6 +559,7 @@ class _LeaderboardScreenState extends State<LeaderboardScreen>
                 controller: _tabController,
                 children: <Widget>[
                   _buildGlobalTab(),
+                  _buildWeeklyTab(),
                   _buildFriendsTab(),
                 ],
               ),
@@ -408,6 +571,9 @@ class _LeaderboardScreenState extends State<LeaderboardScreen>
   }
 
   Widget _buildHeader(BuildContext context) {
+    final bool isWeekly = _tabController.index == 1;
+    final int? rank = isWeekly ? _weeklyUserRank : _currentUserRank;
+    final int? points = isWeekly ? _weeklyPoints : _currentScore;
     return Container(
       padding: const EdgeInsets.fromLTRB(20, 16, 20, 0),
       child: Column(
@@ -426,16 +592,32 @@ class _LeaderboardScreenState extends State<LeaderboardScreen>
               ),
             ],
           ),
-          if (_currentUserRank != null)
+          if (_tabController.index != 2 && (rank != null || points != null))
             Padding(
               padding: const EdgeInsets.only(top: 4, bottom: 12),
-              child: Text(
-                'Ton rang global: #$_currentUserRank',
-                style: GoogleFonts.nunito(
-                  fontSize: 13,
-                  fontWeight: FontWeight.w700,
-                  color: _orange,
-                ),
+              child: Column(
+                children: [
+                  Text(
+                    rank == null
+                        ? 'Ton rang ${isWeekly ? 'cette semaine' : 'général'}: non classé'
+                        : 'Ton rang ${isWeekly ? 'cette semaine' : 'général'}: #$rank',
+                    style: GoogleFonts.nunito(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w700,
+                      color: _orange,
+                    ),
+                  ),
+                  if (points != null)
+                    Text(
+                      '${isWeekly ? 'Points cette semaine' : 'Meilleur score campagne'}: $points pts',
+                      style: GoogleFonts.nunito(fontSize: 12, color: _textGray),
+                    ),
+                  if (isWeekly && (_weekStart != null || _weekEnd != null))
+                    Text(
+                      'Période : ${_formatDate(_weekStart)} – ${_formatDate(_weekEnd)}',
+                      style: GoogleFonts.nunito(fontSize: 12, color: _textGray),
+                    ),
+                ],
               ),
             )
           else
@@ -457,11 +639,12 @@ class _LeaderboardScreenState extends State<LeaderboardScreen>
               labelColor: Colors.white,
               unselectedLabelColor: _textGray,
               labelStyle: GoogleFonts.nunito(
-                fontSize: 14,
+                fontSize: 12,
                 fontWeight: FontWeight.w700,
               ),
               tabs: const <Widget>[
-                Tab(text: 'Global'),
+                Tab(text: 'Général'),
+                Tab(text: 'Cette semaine'),
                 Tab(text: 'Amis'),
               ],
             ),
@@ -479,6 +662,10 @@ class _LeaderboardScreenState extends State<LeaderboardScreen>
       );
     }
 
+    if (_globalError != null) {
+      return _buildRankingError(_globalError!, _loadGlobal);
+    }
+
     if (_globalList.isEmpty) {
       return Center(
         child: Text(
@@ -493,10 +680,13 @@ class _LeaderboardScreenState extends State<LeaderboardScreen>
       onRefresh: _loadGlobal,
       child: ListView.builder(
         padding: const EdgeInsets.symmetric(horizontal: 20),
-        itemCount: _globalList.length,
+        itemCount: _globalList.length + (_globalPage < _globalLastPage ? 1 : 0),
         itemBuilder: (BuildContext context, int index) {
+          if (index == _globalList.length) {
+            return _buildLoadMore(_isLoadingMoreGlobal, _loadGlobalMore);
+          }
           final Map<String, dynamic> user = _globalList[index];
-          final int rank = index + 1;
+          final int rank = _readInt(user['rank']) ?? index + 1;
           final bool isCurrentUser =
               user['id']?.toString() == _currentUserId?.toString();
 
@@ -509,6 +699,79 @@ class _LeaderboardScreenState extends State<LeaderboardScreen>
         },
       ),
     );
+  }
+
+  Widget _buildWeeklyTab() {
+    if (_isLoadingWeekly) {
+      return const Center(child: CircularProgressIndicator(color: _orange));
+    }
+    if (_weeklyError != null) {
+      return _buildRankingError(_weeklyError!, _loadWeekly);
+    }
+    if (_weeklyList.isEmpty) {
+      return Center(
+        child: Text('Aucun joueur cette semaine',
+            style: GoogleFonts.nunito(color: _textGray)),
+      );
+    }
+    return RefreshIndicator(
+      color: _orange,
+      onRefresh: _loadWeekly,
+      child: ListView.builder(
+        padding: const EdgeInsets.symmetric(horizontal: 20),
+        itemCount: _weeklyList.length + (_weeklyPage < _weeklyLastPage ? 1 : 0),
+        itemBuilder: (BuildContext context, int index) {
+          if (index == _weeklyList.length) {
+            return _buildLoadMore(_isLoadingMoreWeekly, _loadWeeklyMore);
+          }
+          final user = _weeklyList[index];
+          return _buildPlayerRow(
+            user: user,
+            rank: _readInt(user['rank']) ?? index + 1,
+            isCurrentUser: user['id']?.toString() == _currentUserId?.toString(),
+            index: index,
+          );
+        },
+      ),
+    );
+  }
+
+  Widget _buildRankingError(String message, Future<void> Function() retry) {
+    return Center(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(message, style: GoogleFonts.nunito(color: _textGray)),
+          const SizedBox(height: 8),
+          TextButton.icon(
+            onPressed: retry,
+            icon: const Icon(Icons.refresh_rounded, color: _orange),
+            label: const Text('Réessayer'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildLoadMore(bool isLoading, Future<void> Function() loadMore) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 12),
+      child: Center(
+        child: isLoading
+            ? const CircularProgressIndicator(color: _orange)
+            : TextButton(
+                onPressed: loadMore,
+                child: const Text('Charger plus de joueurs'),
+              ),
+      ),
+    );
+  }
+
+  String _formatDate(String? value) {
+    if (value == null || value.isEmpty) return '—';
+    final date = DateTime.tryParse(value);
+    if (date == null) return value;
+    return '${date.day.toString().padLeft(2, '0')}/${date.month.toString().padLeft(2, '0')}/${date.year}';
   }
 
   Widget _buildFriendsTab() {
@@ -595,11 +858,14 @@ class _LeaderboardScreenState extends State<LeaderboardScreen>
     Widget rankWidget;
 
     if (rank == 1) {
-      rankWidget = const Icon(Icons.emoji_events_rounded, color: _gold, size: 24);
+      rankWidget =
+          const Icon(Icons.emoji_events_rounded, color: _gold, size: 24);
     } else if (rank == 2) {
-      rankWidget = const Icon(Icons.emoji_events_rounded, color: _silver, size: 24);
+      rankWidget =
+          const Icon(Icons.emoji_events_rounded, color: _silver, size: 24);
     } else if (rank == 3) {
-      rankWidget = const Icon(Icons.emoji_events_rounded, color: _bronze, size: 24);
+      rankWidget =
+          const Icon(Icons.emoji_events_rounded, color: _bronze, size: 24);
     } else {
       rankWidget = Text(
         '$rank',

@@ -9,6 +9,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../../core/config/api_config.dart';
+import '../utils/question_payload.dart';
 
 const _orange = Color(0xFFF77F00);
 const _textDark = Color(0xFF1A1A2E);
@@ -17,17 +18,25 @@ const _cardBg = Color(0xFFF8F9FA);
 const _neutral = Color(0xFFE5E7EB);
 const _correct = Color(0xFF22C55E);
 const _incorrect = Color(0xFFEF4444);
+final ValueNotifier<Map<String, dynamic>?> activeQuizDraftNotifier =
+    ValueNotifier<Map<String, dynamic>?>(null);
 
 class QuizScreen extends StatefulWidget {
   final int? categoryId;
   final String mode;
   final String? challengeCode;
   final Map<String, dynamic>? resumeData;
+  final int? campaignSessionId;
+  final Map<String, dynamic>? campaignLevel;
+  final List<Map<String, dynamic>>? campaignQuestions;
   const QuizScreen({
     super.key,
     this.categoryId,
     this.challengeCode,
     this.resumeData,
+    this.campaignSessionId,
+    this.campaignLevel,
+    this.campaignQuestions,
     required this.mode,
   });
 
@@ -43,7 +52,13 @@ class _QuizScreenState extends State<QuizScreen> {
   bool _isCorrectAnswer = false;
   bool _hasStarted = false;
   bool _isLoading = false;
+  String? _questionLoadError;
   bool _isSubmitting = false;
+  bool _isCampaignAnswerSubmitting = false;
+  String? _campaignAnswerError;
+  bool _campaignFinishPending = false;
+  int? _campaignCorrectAnswerId;
+  int? _campaignPendingResponseTime;
   int _timeLeft = 20;
   int _questionDuration = 20;
   bool _offlineGame = false;
@@ -57,7 +72,19 @@ class _QuizScreenState extends State<QuizScreen> {
     super.initState();
     _sessionStartTime = DateTime.now().millisecondsSinceEpoch;
     final saved = widget.resumeData;
-    if (saved != null && saved['questions'] is List) {
+    if (widget.campaignSessionId != null && widget.campaignQuestions != null) {
+      _questions = widget.campaignQuestions!
+          .asMap()
+          .entries
+          .map((entry) => _normalizeQuestion(entry.value, entry.key))
+          .whereType<Map<String, dynamic>>()
+          .toList();
+      _hasStarted = _questions.isNotEmpty;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted && _hasStarted) _startTimer();
+      });
+    } else if (saved != null && saved['questions'] is List) {
+      activeQuizDraftNotifier.value = saved;
       _questions = (saved['questions'] as List)
           .asMap()
           .entries
@@ -101,19 +128,23 @@ class _QuizScreenState extends State<QuizScreen> {
       value is int ? value : int.tryParse(value?.toString() ?? '');
 
   Future<void> _persistDraft() async {
-    if (widget.challengeCode != null || _offlineGame || _questions.isEmpty)
+    if (widget.challengeCode != null ||
+        widget.campaignSessionId != null ||
+        _offlineGame ||
+        _questions.isEmpty) {
       return;
+    }
     final prefs = await SharedPreferences.getInstance();
-    await prefs.setString(
-        'active_quiz_draft',
-        jsonEncode({
-          'category_id': widget.categoryId,
-          'mode': widget.mode,
-          'questions': _questions,
-          'answers': _answers,
-          'current_index': _currentIndex,
-          'started_at': _sessionStartTime,
-        }));
+    final draft = <String, dynamic>{
+      'category_id': widget.categoryId,
+      'mode': widget.mode,
+      'questions': _questions,
+      'answers': _answers,
+      'current_index': _currentIndex,
+      'started_at': _sessionStartTime,
+    };
+    await prefs.setString('active_quiz_draft', jsonEncode(draft));
+    activeQuizDraftNotifier.value = draft;
   }
 
   @override
@@ -164,6 +195,7 @@ class _QuizScreenState extends State<QuizScreen> {
         setState(() {
           _questions = challengeQuestions;
           _isLoading = false;
+          _questionLoadError = null;
         });
         _startTimer();
         return;
@@ -226,6 +258,22 @@ class _QuizScreenState extends State<QuizScreen> {
       debugPrint('DIO ERROR: ${e.message}');
       debugPrint('STATUS: ${e.response?.statusCode}');
       debugPrint('DATA: ${e.response?.data}');
+      if (widget.challengeCode != null) {
+        if (e.response?.statusCode == 401) {
+          await _storage.delete(key: 'auth_token');
+          if (mounted) context.go('/auth');
+          return;
+        }
+        if (!mounted) return;
+        final dynamic body = e.response?.data;
+        setState(() {
+          _isLoading = false;
+          _questionLoadError = body is Map && body['message'] is String
+              ? body['message'] as String
+              : 'Impossible de charger ce défi. Vérifie le code puis réessaie.';
+        });
+        return;
+      }
       if (e.response?.statusCode == 401) {
         await _loadOfflineQuestions();
         if (!_offlineGame) {
@@ -237,6 +285,16 @@ class _QuizScreenState extends State<QuizScreen> {
       await _loadOfflineQuestions();
     } catch (e) {
       debugPrint('ERROR: $e');
+      if (widget.challengeCode != null) {
+        if (!mounted) return;
+        setState(() {
+          _isLoading = false;
+          _questionLoadError = e is StateError
+              ? e.message
+              : 'Impossible de charger ce défi. Vérifie le code puis réessaie.';
+        });
+        return;
+      }
       await _loadOfflineQuestions();
     }
   }
@@ -288,27 +346,9 @@ class _QuizScreenState extends State<QuizScreen> {
   List<dynamic> _extractQuestionsPayload(dynamic payload) {
     final data = _decodeIfJsonString(payload);
     debugPrint('ROOT PAYLOAD TYPE: ${data.runtimeType}');
-
-    if (data is List) {
-      debugPrint('ROOT PAYLOAD IS LIST: ${data.length} item(s)');
-      return data;
-    }
-
-    if (data is Map) {
-      debugPrint('ROOT PAYLOAD KEYS: ${data.keys.join(', ')}');
-      final nestedData = data['data'];
-      debugPrint('NESTED DATA TYPE: ${nestedData.runtimeType}');
-
-      if (nestedData is List) return nestedData;
-
-      if (nestedData is Map && nestedData['data'] is List) {
-        final nestedList = nestedData['data'] as List;
-        debugPrint('SECOND LEVEL DATA LIST: ${nestedList.length} item(s)');
-        return nestedList;
-      }
-    }
-
-    return const [];
+    final questions = extractQuestionPayload(data);
+    debugPrint('QUESTIONS PAYLOAD LENGTH: ${questions.length}');
+    return questions;
   }
 
   Map<String, dynamic>? _normalizeQuestion(dynamic json, int index) {
@@ -320,7 +360,10 @@ class _QuizScreenState extends State<QuizScreen> {
     }
 
     final question = _stringKeyMap(json);
-    final options = _normalizeOptions(question['options']);
+    final dynamic rawOptions = widget.campaignSessionId != null
+        ? (question['options'] ?? question['answers'])
+        : question['options'];
+    final options = _normalizeOptions(rawOptions);
 
     question['id'] = _parseInt(question['id']) ?? index + 1;
     question['question_text'] = _firstText(
@@ -425,6 +468,12 @@ class _QuizScreenState extends State<QuizScreen> {
 
   void _startTimer() {
     _timer?.cancel();
+    final questionLimit =
+        widget.campaignSessionId != null && _currentIndex < _questions.length
+            ? _parseInt(_questions[_currentIndex]['time_limit'])
+            : null;
+    _questionDuration =
+        questionLimit != null && questionLimit > 0 ? questionLimit : 20;
     _timeLeft = _questionDuration;
     _timer = Timer.periodic(const Duration(seconds: 1), (timer) {
       if (!mounted) {
@@ -443,8 +492,12 @@ class _QuizScreenState extends State<QuizScreen> {
   void _stopTimer() => _timer?.cancel();
 
   void _onOptionSelected(int? optionId) {
-    if (_answered) return;
+    if (_answered || _isCampaignAnswerSubmitting) return;
     _stopTimer();
+    if (widget.campaignSessionId != null) {
+      _submitCampaignAnswer(optionId);
+      return;
+    }
     final responseTime = _questionDuration - _timeLeft;
     final question = _questions[_currentIndex];
     bool isCorrect = false;
@@ -480,6 +533,9 @@ class _QuizScreenState extends State<QuizScreen> {
         _selectedOptionId = null;
         _answered = false;
         _isCorrectAnswer = false;
+        _campaignCorrectAnswerId = null;
+        _campaignAnswerError = null;
+        _campaignPendingResponseTime = null;
         _timeLeft = _questionDuration;
       });
       _persistDraft();
@@ -489,8 +545,148 @@ class _QuizScreenState extends State<QuizScreen> {
     }
   }
 
+  Future<void> _submitCampaignAnswer(int? optionId) async {
+    final sessionId = widget.campaignSessionId;
+    if (sessionId == null || _currentIndex >= _questions.length) return;
+    final question = _questions[_currentIndex];
+    _campaignPendingResponseTime ??=
+        (_questionDuration - _timeLeft).clamp(0, 300);
+    setState(() {
+      _selectedOptionId = optionId;
+      _isCampaignAnswerSubmitting = true;
+      _campaignAnswerError = null;
+      _campaignFinishPending = false;
+    });
+
+    try {
+      final token = await _storage.read(key: 'auth_token');
+      if (token == null || token.isEmpty) {
+        throw StateError('Session expirée. Reconnecte-toi.');
+      }
+      final dio = ApiConfig.createDio(authToken: token);
+      final response = await dio.post<dynamic>(
+        '/v1/game-sessions/$sessionId/answer',
+        data: <String, dynamic>{
+          'question_id': question['id'],
+          'answer_id': optionId,
+          'response_time': _campaignPendingResponseTime,
+        },
+      );
+      final dynamic envelope = response.data;
+      final dynamic payload = envelope is Map ? envelope['data'] : null;
+      if (response.statusCode != 200 ||
+          envelope is! Map ||
+          envelope['success'] != true ||
+          payload is! Map ||
+          payload['is_correct'] is! bool) {
+        throw StateError('Réponse serveur invalide. Réessaie.');
+      }
+
+      final int? correctAnswerId = _parseInt(payload['correct_answer_id']);
+      question['explanation'] =
+          payload['explanation']?.toString() ?? question['explanation'] ?? '';
+      _answers.add(<String, dynamic>{
+        'question_id': question['id'],
+        'selected_option_id': optionId,
+        'response_time_seconds': _campaignPendingResponseTime,
+        'is_correct': payload['is_correct'],
+      });
+      if (!mounted) return;
+      setState(() {
+        _campaignCorrectAnswerId = correctAnswerId;
+        _isCorrectAnswer = payload['is_correct'] as bool;
+        _answered = true;
+        _isCampaignAnswerSubmitting = false;
+        _campaignPendingResponseTime = null;
+      });
+      Future.delayed(const Duration(seconds: 2), () {
+        if (mounted) _nextQuestion();
+      });
+    } on DioException catch (error) {
+      if (!mounted) return;
+      final dynamic body = error.response?.data;
+      setState(() {
+        _isCampaignAnswerSubmitting = false;
+        _campaignAnswerError = body is Map && body['message'] is String
+            ? body['message'] as String
+            : 'La réponse n’a pas été envoyée. Vérifie ta connexion et réessaie.';
+      });
+    } catch (error) {
+      if (!mounted) return;
+      setState(() {
+        _isCampaignAnswerSubmitting = false;
+        _campaignAnswerError = error is StateError
+            ? error.message
+            : 'La réponse n’a pas été envoyée. Réessaie.';
+      });
+    }
+  }
+
   Future<void> _submitSession() async {
     setState(() => _isSubmitting = true);
+    if (widget.campaignSessionId != null) {
+      try {
+        final token = await _storage.read(key: 'auth_token');
+        if (token == null || token.isEmpty) {
+          throw StateError('Session expirée. Reconnecte-toi.');
+        }
+        final dio = ApiConfig.createDio(authToken: token);
+        final response = await dio.post<dynamic>(
+          '/v1/game-sessions/${widget.campaignSessionId}/finish',
+        );
+        final dynamic envelope = response.data;
+        final dynamic payload = envelope is Map ? envelope['data'] : null;
+        if (response.statusCode != 200 ||
+            envelope is! Map ||
+            envelope['success'] != true ||
+            payload is! Map) {
+          throw StateError('Le résultat de la campagne est invalide.');
+        }
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.remove('active_quiz_draft');
+        await prefs.remove('home_cache');
+        activeQuizDraftNotifier.value = null;
+        if (mounted) {
+          context.go('/result', extra: <String, dynamic>{
+            'mode': 'campaign',
+            'level': widget.campaignLevel,
+            'category': <String, dynamic>{
+              'name': widget.campaignLevel?['name'] ?? 'Campagne',
+            },
+            'correct_answers': payload['correct_answers'] ?? 0,
+            'total_questions': _questions.length,
+            'total_score': payload['score'] ?? 0,
+            'score': payload['score'] ?? 0,
+            'xp_earned': payload['xp_earned'] ?? 0,
+            'coins_earned': payload['coins_earned'] ?? 0,
+            'gems_earned': payload['gems_earned'] ?? 0,
+            'accuracy': payload['accuracy'] ?? 0,
+            'answers': _answers,
+            'rewards': payload['rewards'],
+          });
+        }
+      } on DioException catch (error) {
+        if (!mounted) return;
+        final dynamic body = error.response?.data;
+        setState(() {
+          _isSubmitting = false;
+          _campaignAnswerError = body is Map && body['message'] is String
+              ? body['message'] as String
+              : 'Impossible de terminer la session. Réessaie.';
+          _campaignFinishPending = true;
+        });
+      } catch (error) {
+        if (!mounted) return;
+        setState(() {
+          _isSubmitting = false;
+          _campaignAnswerError = error is StateError
+              ? error.message
+              : 'Impossible de terminer la session. Réessaie.';
+          _campaignFinishPending = true;
+        });
+      }
+      return;
+    }
     if (widget.challengeCode != null) {
       try {
         final token = await _storage.read(key: 'auth_token');
@@ -543,6 +739,7 @@ class _QuizScreenState extends State<QuizScreen> {
       };
       final prefs = await SharedPreferences.getInstance();
       await prefs.remove('active_quiz_draft');
+      activeQuizDraftNotifier.value = null;
       final history = prefs.getStringList('offline_results') ?? <String>[];
       history.add(jsonEncode(result));
       await prefs.setStringList('offline_results', history);
@@ -569,6 +766,7 @@ class _QuizScreenState extends State<QuizScreen> {
       if (sessionData is Map && sessionData['success'] == true) {
         final prefs = await SharedPreferences.getInstance();
         await prefs.remove('active_quiz_draft');
+        activeQuizDraftNotifier.value = null;
         await prefs.remove('home_cache');
         debugPrint('Cache Home invalidé');
         if (mounted) {
@@ -932,7 +1130,9 @@ class _QuizScreenState extends State<QuizScreen> {
     final question = _questions[_currentIndex];
     final options = _optionsOf(question);
     final correctOption = options.firstWhere(
-      (o) => o['is_correct'] == true,
+      (option) => widget.campaignSessionId != null
+          ? _parseInt(option['id']) == _campaignCorrectAnswerId
+          : option['is_correct'] == true,
       orElse: () => <String, dynamic>{
         'option_text': '',
       },
@@ -1043,7 +1243,9 @@ class _QuizScreenState extends State<QuizScreen> {
         final option = options[i];
         final optionId = _parseInt(option['id']) ?? i + 1;
         final isSelected = _selectedOptionId == optionId;
-        final isCorrectOption = option['is_correct'] == true;
+        final isCorrectOption = widget.campaignSessionId != null
+            ? _answered && _parseInt(option['id']) == _campaignCorrectAnswerId
+            : option['is_correct'] == true;
         final isWrongSelected = isSelected && !isCorrectOption;
         final isRightOption = isCorrectOption && _answered;
         final isNotSelected = _answered && !isSelected && !isRightOption;
@@ -1101,7 +1303,9 @@ class _QuizScreenState extends State<QuizScreen> {
             bottom: i == options.length - 1 ? 0 : 12,
           ),
           child: GestureDetector(
-            onTap: _answered ? null : () => _onOptionSelected(optionId),
+            onTap: _answered || _isCampaignAnswerSubmitting
+                ? null
+                : () => _onOptionSelected(optionId),
             child: AnimatedOpacity(
               duration: const Duration(milliseconds: 300),
               opacity: isNotSelected ? 0.4 : 1.0,
@@ -1207,6 +1411,41 @@ class _QuizScreenState extends State<QuizScreen> {
                   const SizedBox(height: 18),
                   _buildQuestionCard(),
                   const SizedBox(height: 24),
+                  if (_campaignAnswerError != null) ...[
+                    Container(
+                      padding: const EdgeInsets.all(14),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFFFEBEB),
+                        borderRadius: BorderRadius.circular(14),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(_campaignAnswerError!,
+                              style: GoogleFonts.nunito(
+                                  color: _incorrect,
+                                  fontWeight: FontWeight.w700)),
+                          TextButton(
+                            onPressed: _isSubmitting
+                                ? null
+                                : _campaignFinishPending
+                                    ? _submitSession
+                                    : () => _submitCampaignAnswer(
+                                          _selectedOptionId,
+                                        ),
+                            child: Text(_campaignFinishPending
+                                ? 'Réessayer la fin de partie'
+                                : 'Réessayer l’envoi'),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                  ],
+                  if (_isCampaignAnswerSubmitting) ...[
+                    const LinearProgressIndicator(color: _orange),
+                    const SizedBox(height: 16),
+                  ],
                   _buildOptions(),
                   if (_answered) ...[
                     const SizedBox(height: 20),
@@ -1257,17 +1496,26 @@ class _QuizScreenState extends State<QuizScreen> {
           children: [
             const Icon(Icons.quiz_outlined, size: 64, color: _neutral),
             const SizedBox(height: 16),
-            Text('Aucune question disponible',
+            Text(_questionLoadError ?? 'Aucune question disponible',
+                textAlign: TextAlign.center,
                 style: GoogleFonts.nunito(fontSize: 16, color: _textGray)),
             const SizedBox(height: 24),
             ElevatedButton(
-              onPressed: () => context.pop(),
+              onPressed: widget.challengeCode == null
+                  ? () => context.pop()
+                  : () {
+                      setState(() {
+                        _isLoading = true;
+                        _questionLoadError = null;
+                      });
+                      _loadQuestions();
+                    },
               style: ElevatedButton.styleFrom(
                 backgroundColor: _orange,
                 shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(14)),
               ),
-              child: Text('Retour',
+              child: Text(widget.challengeCode == null ? 'Retour' : 'Réessayer',
                   style: GoogleFonts.nunito(
                       color: Colors.white, fontWeight: FontWeight.w700)),
             ),
