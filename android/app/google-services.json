@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "954524448331",
+    "project_id": "notifquizz",
+    "storage_bucket": "notifquizz.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:954524448331:android:2d35ec00a2bac77574ffce",
+        "android_client_info": {
+          "package_name": "com.example.ivoire_quizz"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyApKndWGdc7gY-3encoJ8X6CIJTIUnTSms"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

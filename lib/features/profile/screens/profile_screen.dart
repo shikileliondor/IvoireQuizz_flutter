@@ -10,6 +10,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../../core/audio/app_audio_controller.dart';
 import '../../../core/config/api_config.dart';
+import '../../../core/notifications/push_notifications.dart';
 import '../../../main.dart' show appTextScale, appHighContrast, appReduceMotion;
 
 const _orange = Color(0xFFF77F00);
@@ -302,6 +303,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
       setState(() => _isLoggingOut = true);
     }
     try {
+      // Avant /auth/logout : la désinscription a besoin du jeton encore valide.
+      await PushNotifications.unregisterDevice();
       final token = await _storage.read(key: 'auth_token');
       if (!mounted) return;
 

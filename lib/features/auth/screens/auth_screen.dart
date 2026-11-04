@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
@@ -8,6 +10,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 
 import '../../../core/config/api_config.dart';
+import '../../../core/notifications/push_notifications.dart';
 
 class AuthScreen extends StatefulWidget {
   final bool showLogin;
@@ -146,6 +149,7 @@ class _AuthScreenState extends State<AuthScreen>
       if (response.statusCode == 201) {
         final token = response.data['data']['token'];
         await _storage.write(key: 'auth_token', value: token);
+        unawaited(PushNotifications.registerDevice());
         if (mounted) context.go('/home');
       }
     } on DioException catch (e) {
@@ -197,6 +201,7 @@ class _AuthScreenState extends State<AuthScreen>
       if (response.statusCode == 200) {
         final token = response.data['data']['token'];
         await _storage.write(key: 'auth_token', value: token);
+        unawaited(PushNotifications.registerDevice());
         if (mounted) context.go('/home');
       }
     } on DioException catch (e) {
@@ -272,6 +277,7 @@ class _AuthScreenState extends State<AuthScreen>
       }
 
       await _storage.write(key: 'auth_token', value: token);
+      unawaited(PushNotifications.registerDevice());
       if (mounted) context.go('/home');
     } on DioException catch (e) {
       setState(() => _errorMessage = _googleApiErrorMessage(e));

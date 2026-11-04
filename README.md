@@ -33,9 +33,14 @@ Google Sign-In sur iOS.
 ```bash
 flutter run
 flutter build appbundle
-# Pour utiliser un autre client Web :
-flutter run --dart-define=GOOGLE_WEB_CLIENT_ID="AUTRE_ID_CLIENT_WEB.apps.googleusercontent.com"
+# Pour utiliser un autre client Web (ID complet, suffixe compris) :
+flutter run --dart-define=GOOGLE_WEB_CLIENT_ID="123456789-abcdef.apps.googleusercontent.com"
 ```
+
+`GOOGLE_WEB_CLIENT_ID` doit être l'ID du client **Web**, jamais celui du client
+Android (`121288560456-683m9oc5…`). Avec l'ID Android, Google refuse la
+connexion (`Invalid audience value` dans `adb logcat`, `sign_in_failed` dans
+l'app). Sans `--dart-define`, le bon ID Web est utilisé.
 
 L'ID client OAuth est un identifiant public. Ne mettez jamais de secret client
 OAuth dans l'application. Le flux Flutter envoie l'ID token à l'API, qui le

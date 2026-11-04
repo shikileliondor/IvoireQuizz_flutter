@@ -43,3 +43,10 @@ app.*.map.json
 /android/app/debug
 /android/app/profile
 /android/app/release
+
+# Secrets : clés de compte de service et secrets OAuth (réservés au backend)
+*firebase-adminsdk*.json
+client_secret_*.json
+*.jks
+*.keystore
+key.properties

@@ -47,6 +47,10 @@ dependencies:
   vibration: ^2.0.0   # 🔥 version stable
   share_plus: ^11.1.0
 
+  # Notifications push (projet Firebase « notifquizz »)
+  firebase_core: ^5.1.0
+  firebase_messaging: ^17.0.1
+
 dev_dependencies:
   flutter_test:
     sdk: flutter
@@ -70,6 +74,9 @@ flutter:
 flutter_launcher_icons:
   android: true
   ios: true
-  image_path: "assets/avecfodn.jpeg"
-  adaptive_icon_background: "#F77F00"
-  adaptive_icon_foreground: "assets/avecfodn.jpeg"
+  # Icônes carrées générées depuis assets/avecfodn.jpeg, éléphant centré.
+  # Le calque adaptatif garde une marge : Android rogne tout ce qui dépasse les 66 % centraux.
+  image_path: "assets/icon/app_icon.png"
+  adaptive_icon_background: "#FFFFFF"
+  adaptive_icon_foreground: "assets/icon/app_icon_foreground.png"
+  remove_alpha_ios: true

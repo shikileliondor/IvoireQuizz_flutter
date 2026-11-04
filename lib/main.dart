@@ -1,10 +1,16 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'core/audio/app_audio_controller.dart';
+import 'core/notifications/push_notifications.dart';
 import 'core/router/app_router.dart';
 import 'core/theme/app_theme.dart';
+
+final GlobalKey<ScaffoldMessengerState> appMessengerKey =
+    GlobalKey<ScaffoldMessengerState>();
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -19,6 +25,9 @@ Future<void> main() async {
   appReduceMotion.value = reduceMotion;
   await AppAudioController.instance.initialize();
   runApp(const ProviderScope(child: IvoireQuizApp()));
+  // Après l'affichage : n'allonge pas le démarrage et la demande
+  // d'autorisation de notifications apparaît par-dessus l'app.
+  unawaited(PushNotifications.init(messengerKey: appMessengerKey));
 }
 
 final ValueNotifier<double> appTextScale = ValueNotifier<double>(1.0);
@@ -39,6 +48,7 @@ class IvoireQuizApp extends ConsumerWidget {
           builder: (context, reduceMotion, _) => MaterialApp.router(
             title: 'IvoireQuiz',
             debugShowCheckedModeBanner: false,
+            scaffoldMessengerKey: appMessengerKey,
             theme: AppTheme.light.copyWith(
               colorScheme: AppTheme.light.colorScheme.copyWith(
                 primary: highContrast ? const Color(0xFF9C3F00) : null,

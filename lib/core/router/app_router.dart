@@ -15,10 +15,14 @@ import '../../features/profile/screens/profile_screen.dart';
 import '../../features/profile/screens/history_screen.dart';
 import '../../features/quiz/screens/quiz_screen.dart';
 import '../../features/result/screens/result_screen.dart';
+import '../notifications/push_notifications.dart';
 import '../theme/app_theme.dart';
+
+final GlobalKey<NavigatorState> appNavigatorKey = GlobalKey<NavigatorState>();
 
 final Provider<GoRouter> routerProvider = Provider<GoRouter>((Ref ref) {
   return GoRouter(
+    navigatorKey: appNavigatorKey,
     initialLocation: '/splash',
     routes: <RouteBase>[
       GoRoute(
@@ -215,11 +219,12 @@ class SplashScreen extends StatelessWidget {
     const FlutterSecureStorage storage = FlutterSecureStorage();
     final String? token = await storage.read(key: 'auth_token');
     final String? onboardingDone = await storage.read(key: 'onboarding_done');
+    await PushNotifications.waitUntilInitialMessageChecked();
 
     if (!context.mounted) return;
 
     if (token != null) {
-      context.go('/home');
+      context.go(PushNotifications.takeInitialLocation() ?? '/home');
     } else if (onboardingDone == null) {
       context.go('/onboarding');
     } else {
