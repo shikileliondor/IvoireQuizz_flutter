@@ -112,6 +112,8 @@ Projet Google Cloud : `advance-copilot-512410-f6`.
   Google répond `sign_in_failed` / `ApiException: 10`.
 - Clé de debug du PC actuel :
   `C5:ED:A2:5E:0F:EF:C3:CD:27:49:85:26:57:E7:D7:BF:6B:15:96:DD`.
+- Clé de publication (`C:/Users/Lenovo/cles/ivoirequiz-upload.jks`, alias
+  `upload`) : `FA:C6:4A:39:AD:B8:26:DA:3B:AC:A8:5A:61:59:86:FC:58:CB:96:55`.
 - Pour lire une empreinte : `cd android && ./gradlew signingReport`, ou
   `keytool -list -v -keystore ~/.android/debug.keystore -alias androiddebugkey -storepass android`.
 - iOS n'est pas configuré : il manque le client OAuth iOS
