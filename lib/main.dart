@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -14,6 +15,9 @@ final GlobalKey<ScaffoldMessengerState> appMessengerKey =
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  // Aucun journal en release : l'app y écrirait les questions avec leurs
+  // bonnes réponses et les réponses du serveur, lisibles via adb logcat.
+  if (kReleaseMode) debugPrint = (String? message, {int? wrapWidth}) {};
   final preferences = await SharedPreferences.getInstance();
   final scale = preferences.getDouble('accessibility_text_scale') ?? 1.0;
   final highContrast =

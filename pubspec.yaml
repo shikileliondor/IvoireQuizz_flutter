@@ -66,8 +66,11 @@ dev_dependencies:
 
 flutter:
   uses-material-design: true
+  # Fichiers listés un par un : la racine de assets/ contient aussi les
+  # originaux non utilisés (vidéo, PNG de la mascotte avec damier), ~15 Mo.
   assets:
-    - assets/
+    - assets/avecfodn.jpeg
+    - assets/morel1.png
     - assets/audio/
     - assets/mascot/
 

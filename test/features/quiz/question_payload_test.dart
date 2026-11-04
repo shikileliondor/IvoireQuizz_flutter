@@ -17,4 +17,17 @@ void main() {
     expect(questions, hasLength(1));
     expect(questions.single['id'], 17);
   });
+
+  test('reads difficulty sent as text by the API', () {
+    expect(parseDifficulty('easy'), 1);
+    expect(parseDifficulty('medium'), 2);
+    expect(parseDifficulty(' Hard '), 3);
+  });
+
+  test('keeps numeric difficulty and rejects unknown values', () {
+    expect(parseDifficulty(2), 2);
+    expect(parseDifficulty('3'), 3);
+    expect(parseDifficulty('expert'), isNull);
+    expect(parseDifficulty(null), isNull);
+  });
 }

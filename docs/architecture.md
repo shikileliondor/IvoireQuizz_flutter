@@ -149,7 +149,7 @@ Les réponses du backend suivent l'enveloppe Laravel
 |---|---|---|
 | `accessibility_text_scale` / `_high_contrast` / `_reduce_motion` | Réglages d'accessibilité | Profil |
 | `home_cache` | Dernier utilisateur, catégories et dernière partie affichés sur l'accueil | Accueil |
-| `active_quiz_draft` | Partie en cours (questions, réponses, question courante) pour la reprendre | Quiz |
+| `active_quiz_draft` | Partie en cours (questions, réponses, question courante, temps par question) pour la reprendre | Quiz |
 | `quiz_cache_<categorie>_<mode>` | Dernières questions reçues, pour jouer hors ligne | Quiz |
 | `offline_results` | Résultats des parties jouées hors ligne | Quiz |
 | `audio_music_enabled` | Active ou coupe la musique globale | Profil / contrôleur audio |

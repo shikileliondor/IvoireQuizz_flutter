@@ -100,6 +100,8 @@ class _QuizScreenState extends State<QuizScreen> {
       _currentIndex = ((_asInt(saved['current_index']) ?? 0)
           .clamp(0, _questions.isEmpty ? 0 : _questions.length - 1));
       _sessionStartTime = _asInt(saved['started_at']) ?? _sessionStartTime;
+      _questionDuration =
+          _asInt(saved['question_duration']) ?? _questionDuration;
       _hasStarted = _questions.isNotEmpty;
       final currentId =
           _questions.isEmpty ? null : _questions[_currentIndex]['id'];
@@ -141,6 +143,7 @@ class _QuizScreenState extends State<QuizScreen> {
       'answers': _answers,
       'current_index': _currentIndex,
       'started_at': _sessionStartTime,
+      'question_duration': _questionDuration,
     };
     await prefs.setString('active_quiz_draft', jsonEncode(draft));
     activeQuizDraftNotifier.value = draft;
@@ -369,7 +372,8 @@ class _QuizScreenState extends State<QuizScreen> {
       const ['question_text', 'question', 'text', 'label'],
     );
     question['explanation'] = _firstText(question, const ['explanation']);
-    question['difficulty'] = _parseInt(question['difficulty']) ?? 1;
+    // 0 : badge neutre « Question » plutôt qu'un faux « Facile ».
+    question['difficulty'] = parseDifficulty(question['difficulty']) ?? 0;
     question['options'] = options;
 
     debugPrint(
@@ -466,12 +470,14 @@ class _QuizScreenState extends State<QuizScreen> {
 
   void _startTimer() {
     _timer?.cancel();
-    final questionLimit =
-        widget.campaignSessionId != null && _currentIndex < _questions.length
-            ? _parseInt(_questions[_currentIndex]['time_limit'])
-            : null;
-    _questionDuration =
-        questionLimit != null && questionLimit > 0 ? questionLimit : 20;
+    // Hors Campagne, on garde le temps choisi sur l'écran d'avant-partie.
+    if (widget.campaignSessionId != null) {
+      final questionLimit = _currentIndex < _questions.length
+          ? _parseInt(_questions[_currentIndex]['time_limit'])
+          : null;
+      _questionDuration =
+          questionLimit != null && questionLimit > 0 ? questionLimit : 20;
+    }
     _timeLeft = _questionDuration;
     _timer = Timer.periodic(const Duration(seconds: 1), (timer) {
       if (!mounted) {

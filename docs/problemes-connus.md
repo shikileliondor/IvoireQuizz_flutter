@@ -1,6 +1,6 @@
 # Problèmes connus
 
-État au 28 octobre 2026.
+État au 4 novembre 2026.
 
 ## Bugs ouverts
 
@@ -20,17 +20,6 @@ message exact du serveur n'a pas encore été relevé).
   actives par catégorie.
 - **Effet secondaire** : la partie refusée reste sauvegardée, et « Reprendre ma
   partie » la renvoie, refusée à nouveau, tant que le serveur n'est pas corrigé.
-
-### Le temps par question choisi est ignoré
-
-L'écran d'avant-partie propose 10, 15, 20 ou 30 s, mais `_startTimer`
-([`quiz_screen.dart`](../lib/features/quiz/screens/quiz_screen.dart)) remet
-toujours 20 s hors Campagne.
-
-### Toutes les questions affichent « Facile »
-
-L'API envoie `difficulty` en texte (`"easy"`, `"medium"`…), alors que l'app
-attend un nombre (1, 2, 3) : la valeur retombe sur 1, donc « Facile ».
 
 ### Détail des réponses vide après un niveau de Campagne
 
@@ -55,14 +44,10 @@ seulement) : les questions s'affichent vides avec « Pas de réponse ».
 - **Jeton dans les journaux (corrigé le 28/10)** : l'écran de quiz écrivait le
   jeton Bearer en clair (`TOKEN: …`). Révoquer côté serveur les jetons émis
   avant cette date.
-- **Journaux en production** : `debugPrint` reste actif dans les versions
-  release. L'app y écrit encore les questions reçues, avec leurs bonnes
-  réponses (`DATA: …`), et les réponses du serveur.
-- **HTTP en clair autorisé** : `android:usesCleartextTraffic="true"` dans
-  `AndroidManifest.xml`. L'API de production est en HTTPS : limiter cette
-  option au debug.
-- **Version release signée avec la clé de debug** : voir
-  [Développement › Avant une publication](developpement.md#avant-une-publication).
+- **Clé de publication pas encore créée** : la configuration est prête, mais
+  tant que `android/key.properties` n'existe pas, la release est signée avec
+  la clé de debug. Voir
+  [Développement › Signer la version de publication](developpement.md#signer-la-version-de-publication).
 
 ## Dette technique
 
@@ -75,10 +60,11 @@ seulement) : les questions s'affichent vides avec « Pas de réponse ».
   `percent_indicator`, `fluttertoast`, `intl`, `equatable`,
   `freezed_annotation`, `json_annotation`, `vibration`. En développement :
   `riverpod_generator`, `freezed`, `json_serializable`, `build_runner`.
-- **Images inutilisées incluses dans l'APK (~15 Mo)** : la vidéo
-  `WhatsApp Video 2026-04-07 at 14.36.53.mp4`, les PNG d'origine de la mascotte
-  (`effobi *.png`, `Effobi *.png`), `ivoire Quizz.png`, `kwame.png`. Le dossier
-  `assets/` est déclaré en entier dans `pubspec.yaml`.
+- **Fichiers d'origine dans `assets/`** : la vidéo WhatsApp, les PNG d'origine
+  de la mascotte (`effobi *.png`, `Effobi *.png`) et `ivoire Quizz.png` restent
+  dans le dossier mais ne sont plus inclus dans l'APK : `pubspec.yaml` liste
+  maintenant les fichiers utilisés un par un. Penser à y ajouter toute nouvelle
+  image placée à la racine de `assets/`.
 - **Pas de modèles typés** : tout passe en `Map<String, dynamic>`, et la lecture
   défensive des réponses est recopiée d'un écran à l'autre (`_normalizeMap`,
   `_extractName`… dans Amis et Classement).

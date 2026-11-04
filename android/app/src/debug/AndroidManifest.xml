@@ -4,4 +4,7 @@
          to allow setting breakpoints, to provide hot reload, etc.
     -->
     <uses-permission android:name="android.permission.INTERNET"/>
+    <!-- HTTP en clair seulement en debug, pour un serveur Laravel local
+         (--dart-define=API_BASE_URL=http://...). La release n'accepte que HTTPS. -->
+    <application android:usesCleartextTraffic="true"/>
 </manifest>

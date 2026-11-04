@@ -2,10 +2,9 @@
     <uses-permission android:name="android.permission.INTERNET" />
 
     <application
-        android:label="ivoire_quizz"
+        android:label="IvoireQuiz"
         android:name="${applicationName}"
-        android:icon="@mipmap/ic_launcher"
-        android:usesCleartextTraffic="true">
+        android:icon="@mipmap/ic_launcher">
         <activity
             android:name=".MainActivity"
             android:exported="true"

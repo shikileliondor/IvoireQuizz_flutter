@@ -63,10 +63,11 @@ Un seul écran gère tous les modes :
 1. **Écran d'avant-partie** (sauf Campagne et reprise) : explication du mode et
    sélecteur « Temps par question » (10, 15, 20 ou 30 s). Les questions ne sont
    téléchargées qu'au moment où le joueur démarre.
-2. **Question** : compteur « Question *n* sur *total* », badge de difficulté,
-   minuteur, options de réponse. Le minuteur dure **20 s** ; en Campagne, il
-   prend le `time_limit` de la question. Le choix fait à l'étape 1 n'est pas
-   appliqué (voir [Problèmes connus](problemes-connus.md#bugs-ouverts)).
+2. **Question** : compteur « Question *n* sur *total* », badge de difficulté
+   (Facile, Moyen, Difficile, ou « Question » si l'API n'en donne pas),
+   minuteur, options de réponse. Le minuteur dure le temps choisi à l'étape 1
+   (**20 s** par défaut) ; en Campagne, il prend le `time_limit` de la
+   question.
 3. **Réponse** : la bonne option passe en vert, la mauvaise en rouge, et
    l'explication s'affiche avec un effet sonore correspondant. La question
    suivante arrive **2 secondes** plus tard. Si le temps s'écoule, la question
@@ -82,7 +83,8 @@ réponse est envoyée au serveur, qui dit si elle est juste
 ### Reprendre une partie interrompue
 
 Après chaque réponse, la partie est sauvegardée dans `active_quiz_draft`
-(questions, réponses, question courante, heure de début). Si l'app est fermée,
+(questions, réponses, question courante, heure de début, temps par question).
+Si l'app est fermée,
 l'accueil propose « Reprendre ma partie », qui relance le quiz exactement à
 cette question. Pas de sauvegarde pour les défis, la Campagne et les parties
 hors ligne.

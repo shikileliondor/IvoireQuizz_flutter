@@ -129,16 +129,51 @@ Installer un APK sur le téléphone en Wi-Fi :
 adb -s <ip>:5555 install -t -r build/app/outputs/flutter-apk/app-debug.apk
 ```
 
+### Signer la version de publication
+
+`android/app/build.gradle.kts` lit la clé de publication dans
+`android/key.properties`. Sans ce fichier, la release est signée avec la clé
+de **debug** : elle s'installe sur un téléphone, mais le Play Store la refuse.
+
+1. Créer la clé **une seule fois**, hors du dépôt, et la sauvegarder ailleurs
+   (clé USB, gestionnaire de mots de passe) avec ses mots de passe :
+
+   ```bash
+   keytool -genkeypair -v -keystore C:/Users/Lenovo/cles/ivoirequiz-upload.jks -keyalg RSA -keysize 2048 -validity 10000 -alias upload
+   ```
+
+2. Créer `android/key.properties` (ignoré par git, comme les `*.jks`) :
+
+   ```properties
+   storePassword=<mot de passe du keystore>
+   keyPassword=<mot de passe de la clé>
+   keyAlias=upload
+   storeFile=C:/Users/Lenovo/cles/ivoirequiz-upload.jks
+   ```
+
+3. `flutter build appbundle`, puis envoyer
+   `build/app/outputs/bundle/release/app-release.aab` dans la Play Console.
+4. **Google Sign-In** : ajouter au client OAuth Android le SHA-1 de cette clé
+   (`keytool -list -v -keystore <fichier .jks> -alias upload`) **et** celui de
+   la clé de signature Google Play (*Play Console › Tester et publier ›
+   Intégrité de l'application*). Le Play Store re-signe l'app avec sa propre
+   clé : sans ce second SHA-1, la connexion Google échoue pour tous les joueurs
+   qui installent depuis le Store.
+
+Avec la signature d'application Play, une clé d'envoi perdue peut être
+réinitialisée par le support Google, mais cela prend plusieurs jours.
+
 ### Avant une publication
 
-- **Signature** : la version *release* est signée avec la clé de **debug**
-  (`android/app/build.gradle.kts`). Le Play Store refusera cette clé : créer
-  une clé de publication et un `signingConfig` dédié, puis ajouter son SHA-1
-  au client OAuth Android.
 - **Identifiant** : `com.example.ivoire_quizz` est l'identifiant par défaut de
-  Flutter. Il ne pourra plus changer après la première publication.
-- **Nom affiché** : `android:label="ivoire_quizz"` dans `AndroidManifest.xml`.
-- **Version** : `version:` dans `pubspec.yaml` (`1.0.0+1`).
+  Flutter, que le Play Store refuse. Il ne pourra plus changer après la
+  première publication.
+- **Nom affiché** : `android:label` dans `AndroidManifest.xml` (« IvoireQuiz »).
+- **Version** : `version:` dans `pubspec.yaml` (`1.0.0+1`). Augmenter le
+  nombre après `+` à chaque envoi sur le Play Store.
+- **Journaux** : `debugPrint` est désactivé en release (`main.dart`).
+- **HTTP en clair** : autorisé uniquement en debug
+  (`android/app/src/debug/AndroidManifest.xml`), pour un serveur local.
 
 ### Avertissements de compilation
 
@@ -149,15 +184,18 @@ Kotlin ≥ 2.3.20 dans `android/settings.gradle.kts`.
 ## Icône et images
 
 - Icône de l'app : générée par `flutter_launcher_icons` depuis
-  `assets/avecfodn.jpeg` (fond adaptatif `#F77F00`) :
+  `assets/icon/app_icon.png` (calque adaptatif
+  `assets/icon/app_icon_foreground.png` sur fond blanc) :
   `dart run flutter_launcher_icons`.
 - Mascotte : les PNG d'origine de `assets/` ont un **damier imprimé dans
   l'image** (faux fond transparent). Les versions de `assets/mascot/` sont
   détourées et réduites (`effobi_victoire`, `effobi_defaite`,
   `effobi_reflechit`). Toute nouvelle pose doit être détourée de la même façon
   avant d'être utilisée, sinon le damier s'affiche.
-- Tout le dossier `assets/` est inclus dans l'APK, y compris les fichiers
-  inutilisés (voir [Problèmes connus](problemes-connus.md#dette-technique)).
+- Seuls les fichiers listés dans `pubspec.yaml` sont inclus dans l'APK :
+  `avecfodn.jpeg`, `morel1.png`, `audio/` et `mascot/`. Une nouvelle image
+  posée à la racine de `assets/` doit y être ajoutée, sinon `Image.asset`
+  échoue à l'exécution.
 
 ## Audio
 
