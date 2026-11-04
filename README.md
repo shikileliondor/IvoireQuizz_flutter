@@ -16,9 +16,10 @@ remplacer.
 ### Android
 
 Dans le projet Google Cloud du client Web, créez également un client OAuth de
-type **Android** avec le package `com.example.ivoire_quizz`. Enregistrez les
-empreintes SHA-1 et SHA-256 des certificats utilisés pour le développement et
-la publication (debug et release).
+type **Android** avec le package `net.studiobeyam.ivoirequiz` pour chaque
+certificat qui signe l'app (un SHA-1 par client) : clé de debug, clé de
+publication et clé de signature Google Play. Détails dans
+[docs/developpement.md](docs/developpement.md#google-sign-in).
 
 ### iOS
 

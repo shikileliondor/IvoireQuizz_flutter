@@ -101,14 +101,15 @@ Projet Google Cloud : `advance-copilot-512410-f6`.
 | Client OAuth | ID | Rôle |
 |---|---|---|
 | Web | `121288560456-jj4rih1v…` | `serverClientId` ; le backend vérifie que l'`idToken` lui est destiné |
-| Android | `121288560456-683m9oc5…` | Autorise l'app Android (package + empreinte du certificat) |
+| Android | `121288560456-683m9oc5…` | Autorise l'app Android signée avec la clé de debug du PC |
+| Android (à créer) | « IvoireQuiz upload », « IvoireQuiz Play » | Autorisent la version signée avec la clé de publication et celle re-signée par Google Play |
 
 - **Jamais de secret client OAuth dans l'app.** Seuls les ID clients (publics)
   y figurent. Les fichiers `client_secret_*.json` restent hors du dépôt.
-- Le client Android doit déclarer le package `com.example.ivoire_quizz` et
-  l'empreinte **SHA-1** de chaque certificat qui signe l'app : clé de debug de
-  chaque PC de développement, et clé de publication. Sinon Google répond
-  `sign_in_failed` / `ApiException: 10`.
+- Chaque client Android déclare le package `net.studiobeyam.ivoirequiz` et
+  **un seul** SHA-1 : il faut donc un client par certificat qui signe l'app
+  (clé de debug de chaque PC, clé de publication, clé Google Play). Sinon
+  Google répond `sign_in_failed` / `ApiException: 10`.
 - Clé de debug du PC actuel :
   `C5:ED:A2:5E:0F:EF:C3:CD:27:49:85:26:57:E7:D7:BF:6B:15:96:DD`.
 - Pour lire une empreinte : `cd android && ./gradlew signingReport`, ou
@@ -153,21 +154,22 @@ de **debug** : elle s'installe sur un téléphone, mais le Play Store la refuse.
 
 3. `flutter build appbundle`, puis envoyer
    `build/app/outputs/bundle/release/app-release.aab` dans la Play Console.
-4. **Google Sign-In** : ajouter au client OAuth Android le SHA-1 de cette clé
-   (`keytool -list -v -keystore <fichier .jks> -alias upload`) **et** celui de
-   la clé de signature Google Play (*Play Console › Tester et publier ›
-   Intégrité de l'application*). Le Play Store re-signe l'app avec sa propre
-   clé : sans ce second SHA-1, la connexion Google échoue pour tous les joueurs
-   qui installent depuis le Store.
+4. **Google Sign-In** : créer un client OAuth Android pour le SHA-1 de cette
+   clé (`keytool -list -v -keystore <fichier .jks> -alias upload`) **et** un
+   autre pour celui de la clé de signature Google Play (*Play Console › Tester
+   et publier › Intégrité de l'application*). Le Play Store re-signe l'app avec
+   sa propre clé : sans ce second client, la connexion Google échoue pour tous
+   les joueurs qui installent depuis le Store.
 
 Avec la signature d'application Play, une clé d'envoi perdue peut être
 réinitialisée par le support Google, mais cela prend plusieurs jours.
 
 ### Avant une publication
 
-- **Identifiant** : `com.example.ivoire_quizz` est l'identifiant par défaut de
-  Flutter, que le Play Store refuse. Il ne pourra plus changer après la
-  première publication.
+- **Identifiant** : `net.studiobeyam.ivoirequiz` (`applicationId` et
+  `namespace` dans `android/app/build.gradle.kts`). Il ne pourra plus changer
+  après la première publication. `google-services.json` doit contenir une app
+  Firebase avec ce même package, sinon la compilation échoue.
 - **Nom affiché** : `android:label` dans `AndroidManifest.xml` (« IvoireQuiz »).
 - **Version** : `version:` dans `pubspec.yaml` (`1.0.0+1`). Augmenter le
   nombre après `+` à chaque envoi sur le Play Store.

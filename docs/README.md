@@ -36,7 +36,7 @@ Sur le téléphone de test (Samsung), passer par le Wi-Fi : voir
 |---|---|
 | Flutter / Dart | Flutter 3.47 (stable), Dart ≥ 3.0 |
 | Nom du package Dart | `ivoire_quiz` |
-| Identifiant Android | `com.example.ivoire_quizz` |
+| Identifiant Android | `net.studiobeyam.ivoirequiz` |
 | Identifiant iOS | `com.example.ivoireQuizz` |
 | Version | `1.0.0+1` (`pubspec.yaml`) |
 | Plateformes visées | Android (principale), iOS (Google Sign-In non configuré) |

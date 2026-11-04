@@ -1,4 +1,4 @@
-package com.example.ivoire_quizz
+package net.studiobeyam.ivoirequiz
 
 import io.flutter.embedding.android.FlutterActivity
 
