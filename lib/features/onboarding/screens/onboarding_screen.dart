@@ -508,7 +508,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
         borderRadius: const BorderRadius.all(Radius.circular(12)),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.08),
+            color: Colors.black.withValues(alpha: 0.08),
             blurRadius: 8,
             offset: const Offset(0, 2),
           ),
@@ -627,7 +627,7 @@ class KentePatternPainter extends CustomPainter {
     const stepX = diamondWidth + spacing;
     const stepY = diamondHeight + spacing;
 
-    final paint = Paint()..color = const Color(0xFFF77F00).withOpacity(0.04);
+    final paint = Paint()..color = const Color(0xFFF77F00).withValues(alpha: 0.04);
 
     for (double y = -stepY; y <= size.height + stepY; y += stepY) {
       for (double x = -stepX; x <= size.width + stepX; x += stepX) {

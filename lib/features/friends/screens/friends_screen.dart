@@ -107,14 +107,15 @@ class _FriendsScreenState extends State<FriendsScreen> {
       });
     } catch (e) {
       debugPrint('FRIENDS ERROR: $e');
-      if (!mounted) return;
     } finally {
-      if (!mounted) return;
-
-      setState(() {
-        _isLoading = false;
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+          _loadDataFuture = null;
+        });
+      } else {
         _loadDataFuture = null;
-      });
+      }
     }
   }
 
@@ -322,6 +323,7 @@ class _FriendsScreenState extends State<FriendsScreen> {
       final code = data is Map ? data['code']?.toString() : null;
       if (code == null || !mounted) return;
       await Clipboard.setData(ClipboardData(text: code));
+      if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(
           content: Text(
               'Défi créé contre $friendName · code $code copié. Envoyez-le à votre ami.')));
@@ -329,9 +331,10 @@ class _FriendsScreenState extends State<FriendsScreen> {
     } on DioException catch (error) {
       final body = error.response?.data;
       final message = body is Map ? body['message']?.toString() : null;
-      if (mounted)
+      if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(content: Text(message ?? 'Impossible de créer le défi.')));
+      }
     }
   }
 

@@ -759,7 +759,7 @@ class _KentePatternPainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {
     final paint = Paint()
-      ..color = const Color(0xFFF77F00).withOpacity(0.04)
+      ..color = const Color(0xFFF77F00).withValues(alpha: 0.04)
       ..style = PaintingStyle.fill;
     const double diamondSize = 16;
     const double spacing = 10;

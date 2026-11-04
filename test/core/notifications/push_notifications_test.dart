@@ -45,4 +45,21 @@ void main() {
       );
     });
   });
+
+  group('PushNotifications.isPlayingLocation', () {
+    test('reconnaît les écrans de partie', () {
+      expect(PushNotifications.isPlayingLocation('/quiz/null/mixed'), isTrue);
+      expect(PushNotifications.isPlayingLocation('/quiz/4/category'), isTrue);
+      expect(PushNotifications.isPlayingLocation('/campaign/quiz'), isTrue);
+      expect(PushNotifications.isPlayingLocation('/challenge/ABC123'), isTrue);
+    });
+
+    test('laisse la bannière ailleurs', () {
+      expect(PushNotifications.isPlayingLocation('/home'), isFalse);
+      expect(PushNotifications.isPlayingLocation('/campaign'), isFalse);
+      expect(PushNotifications.isPlayingLocation('/result'), isFalse);
+      expect(PushNotifications.isPlayingLocation('/friends'), isFalse);
+      expect(PushNotifications.isPlayingLocation(null), isFalse);
+    });
+  });
 }

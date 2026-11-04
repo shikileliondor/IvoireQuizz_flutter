@@ -191,8 +191,9 @@ class _QuizScreenState extends State<QuizScreen> {
             .map((entry) => _normalizeQuestion(entry.value, entry.key))
             .whereType<Map<String, dynamic>>()
             .toList();
-        if (challengeQuestions.isEmpty)
+        if (challengeQuestions.isEmpty) {
           throw StateError('Le défi ne contient pas de questions.');
+        }
         if (!mounted) return;
         setState(() {
           _questions = challengeQuestions;
@@ -1086,7 +1087,7 @@ class _QuizScreenState extends State<QuizScreen> {
               border: Border.all(color: _neutral),
               boxShadow: [
                 BoxShadow(
-                  color: Colors.black.withOpacity(0.04),
+                  color: Colors.black.withValues(alpha: 0.04),
                   blurRadius: 20,
                   offset: const Offset(0, 10),
                 ),
@@ -1178,7 +1179,7 @@ class _QuizScreenState extends State<QuizScreen> {
       decoration: BoxDecoration(
         color: backgroundColor,
         borderRadius: const BorderRadius.all(Radius.circular(18)),
-        border: Border.all(color: statusColor.withOpacity(0.35)),
+        border: Border.all(color: statusColor.withValues(alpha: 0.35)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -1359,7 +1360,7 @@ class _QuizScreenState extends State<QuizScreen> {
                   ),
                   boxShadow: [
                     BoxShadow(
-                      color: Colors.black.withOpacity(0.03),
+                      color: Colors.black.withValues(alpha: 0.03),
                       blurRadius: 12,
                       offset: const Offset(0, 6),
                     ),
@@ -1611,7 +1612,7 @@ class _QuizSkeletonBoxState extends State<_QuizSkeletonBox>
           width: widget.width,
           height: widget.height,
           decoration: BoxDecoration(
-            color: _neutral.withOpacity(_animation.value),
+            color: _neutral.withValues(alpha: _animation.value),
             borderRadius: BorderRadius.circular(widget.radius),
           ),
         );

@@ -19,12 +19,33 @@ val keystoreProperties = Properties().apply {
     }
 }
 
+val releaseSigningProperties =
+    listOf("keyAlias", "keyPassword", "storeFile", "storePassword")
+val hasReleaseSigning = keystorePropertiesFile.exists() &&
+    releaseSigningProperties.all { !keystoreProperties.getProperty(it).isNullOrBlank() }
+
+// Refuse toute tache release sans cle de publication. Cela evite de produire
+// accidentellement un artefact non signe ou signe avec la cle de debug.
+gradle.taskGraph.whenReady {
+    val requestsRelease = allTasks.any { task ->
+        task.path.contains("Release", ignoreCase = true)
+    }
+    if (requestsRelease && !hasReleaseSigning) {
+        throw GradleException(
+            "Build release refuse : android/key.properties est absent ou incomplet. " +
+                "Proprietes requises : ${releaseSigningProperties.joinToString()}.",
+        )
+    }
+}
+
 android {
     namespace = "net.studiobeyam.ivoirequiz"
     compileSdk = flutter.compileSdkVersion
     ndkVersion = flutter.ndkVersion
 
     compileOptions {
+        // Exigé par flutter_local_notifications (notifications au premier plan).
+        isCoreLibraryDesugaringEnabled = true
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
     }
@@ -45,7 +66,7 @@ android {
     }
 
     signingConfigs {
-        if (keystorePropertiesFile.exists()) {
+        if (hasReleaseSigning) {
             create("release") {
                 keyAlias = keystoreProperties.getProperty("keyAlias")
                 keyPassword = keystoreProperties.getProperty("keyPassword")
@@ -57,13 +78,17 @@ android {
 
     buildTypes {
         release {
-            signingConfig = signingConfigs.getByName(
-                if (keystorePropertiesFile.exists()) "release" else "debug"
-            )
+            if (hasReleaseSigning) {
+                signingConfig = signingConfigs.getByName("release")
+            }
         }
     }
 }
 
 flutter {
     source = "../.."
+}
+
+dependencies {
+    coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.1.4")
 }

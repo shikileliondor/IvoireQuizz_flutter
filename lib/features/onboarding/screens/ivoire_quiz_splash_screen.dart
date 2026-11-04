@@ -313,7 +313,7 @@ class _MascotFallback extends StatelessWidget {
       decoration: BoxDecoration(
         color: _C.bg,
         shape: BoxShape.circle,
-        border: Border.all(color: _C.orange.withOpacity(0.18)),
+        border: Border.all(color: _C.orange.withValues(alpha: 0.18)),
       ),
       child:
           Icon(Icons.cruelty_free_rounded, color: _C.orange, size: size * 0.44),
@@ -355,7 +355,7 @@ class _BrandTitle extends StatelessWidget {
             width: 50,
             height: 4,
             decoration: BoxDecoration(
-              color: _C.orange.withOpacity(0.28),
+              color: _C.orange.withValues(alpha: 0.28),
               borderRadius: BorderRadius.circular(999),
             ),
           ),
@@ -427,7 +427,7 @@ class _ProgressSection extends StatelessWidget {
           decoration: BoxDecoration(
             color: _C.progressTrack,
             borderRadius: BorderRadius.circular(999),
-            border: Border.all(color: Colors.white.withOpacity(0.70)),
+            border: Border.all(color: Colors.white.withValues(alpha: 0.70)),
           ),
           child: Align(
             alignment: Alignment.centerLeft,
@@ -441,7 +441,7 @@ class _ProgressSection extends StatelessWidget {
                   borderRadius: BorderRadius.circular(999),
                   boxShadow: [
                     BoxShadow(
-                      color: _C.orange.withOpacity(0.28),
+                      color: _C.orange.withValues(alpha: 0.28),
                       blurRadius: 6,
                       offset: const Offset(0, 2),
                     ),
@@ -500,7 +500,7 @@ class _Dot extends StatelessWidget {
           border: borderColor != null ? Border.all(color: borderColor!) : null,
           boxShadow: [
             BoxShadow(
-              color: color.withOpacity(color == Colors.white ? 0.08 : 0.22),
+              color: color.withValues(alpha: color == Colors.white ? 0.08 : 0.22),
               blurRadius: 10,
               offset: const Offset(0, 4),
             ),
@@ -564,7 +564,7 @@ class _Ghost extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) =>
-      Icon(icon, size: size, color: _C.textDark.withOpacity(0.028));
+      Icon(icon, size: size, color: _C.textDark.withValues(alpha: 0.028));
 }
 
 class _CornerPattern extends StatelessWidget {
@@ -596,7 +596,7 @@ class _CornerPainter extends CustomPainter {
       ..style = PaintingStyle.stroke
       ..strokeWidth = 1.0
       ..strokeCap = StrokeCap.round
-      ..color = color.withOpacity(0.26);
+      ..color = color.withValues(alpha: 0.26);
 
     for (var i = 0; i < 6; i++) {
       final inset = 12.0 + i * 17;
@@ -635,13 +635,13 @@ class _Ornament extends StatelessWidget {
   Widget build(BuildContext context) {
     if (isStar) {
       return Icon(Icons.auto_awesome_rounded,
-          color: color.withOpacity(0.68), size: size);
+          color: color.withValues(alpha: 0.68), size: size);
     }
     return Container(
       width: size,
       height: size,
       decoration:
-          BoxDecoration(color: color.withOpacity(0.68), shape: BoxShape.circle),
+          BoxDecoration(color: color.withValues(alpha: 0.68), shape: BoxShape.circle),
     );
   }
 }

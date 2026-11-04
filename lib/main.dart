@@ -10,9 +10,6 @@ import 'core/notifications/push_notifications.dart';
 import 'core/router/app_router.dart';
 import 'core/theme/app_theme.dart';
 
-final GlobalKey<ScaffoldMessengerState> appMessengerKey =
-    GlobalKey<ScaffoldMessengerState>();
-
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   // Aucun journal en release : l'app y écrirait les questions avec leurs
@@ -31,7 +28,7 @@ Future<void> main() async {
   runApp(const ProviderScope(child: IvoireQuizApp()));
   // Après l'affichage : n'allonge pas le démarrage et la demande
   // d'autorisation de notifications apparaît par-dessus l'app.
-  unawaited(PushNotifications.init(messengerKey: appMessengerKey));
+  unawaited(PushNotifications.init());
 }
 
 final ValueNotifier<double> appTextScale = ValueNotifier<double>(1.0);
@@ -52,7 +49,6 @@ class IvoireQuizApp extends ConsumerWidget {
           builder: (context, reduceMotion, _) => MaterialApp.router(
             title: 'IvoireQuiz',
             debugShowCheckedModeBanner: false,
-            scaffoldMessengerKey: appMessengerKey,
             theme: AppTheme.light.copyWith(
               colorScheme: AppTheme.light.colorScheme.copyWith(
                 primary: highContrast ? const Color(0xFF9C3F00) : null,

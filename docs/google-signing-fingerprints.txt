@@ -1,0 +1,15 @@
+IvoireQuiz — certificat d'upload Android
+Package : net.studiobeyam.ivoirequiz
+Alias : upload
+
+SHA-1
+FA:C6:4A:39:AD:B8:26:DA:3B:AC:A8:5A:61:59:86:FC:58:CB:96:55
+
+SHA-256
+A4:1D:C5:32:0D:F1:65:50:20:BD:26:E8:47:FB:49:65:DF:F8:3F:94:8E:08:94:EB:C7:DD:0A:08:18:D8:75:2A
+
+Validité : jusqu'au 22 mars 2054
+
+Certificat de signature Google Play
+SHA-1 : À COPIER DEPUIS PLAY CONSOLE > INTÉGRITÉ DE L'APPLICATION
+SHA-256 : À COPIER DEPUIS PLAY CONSOLE > INTÉGRITÉ DE L'APPLICATION

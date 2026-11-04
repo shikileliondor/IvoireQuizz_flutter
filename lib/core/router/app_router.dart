@@ -289,7 +289,7 @@ class _AnimatedNavBar extends StatelessWidget {
       selectedIndex: selectedIndex,
       onDestinationSelected: onTap,
       // Garde le style Material 3 existant, juste une couleur d'indication
-      indicatorColor: AppColors.orange.withOpacity(0.18),
+      indicatorColor: AppColors.orange.withValues(alpha: 0.18),
       destinations: List.generate(_destinations.length, (i) {
         final bool active = i == selectedIndex;
         return NavigationDestination(

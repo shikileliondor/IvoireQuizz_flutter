@@ -174,7 +174,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
       debugPrint('API ERROR: $e');
       if (e.response?.statusCode == 401) {
         await const FlutterSecureStorage().delete(key: 'auth_token');
-        if (!context.mounted) return;
+        if (!mounted) return;
         context.go('/auth');
         return;
       }
@@ -558,7 +558,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                   width: 44,
                   height: 44,
                   decoration: BoxDecoration(
-                    color: Colors.white.withOpacity(0.2),
+                    color: Colors.white.withValues(alpha: 0.2),
                     borderRadius: BorderRadius.circular(14),
                   ),
                   child: const Icon(Icons.map_rounded, color: Colors.white),
@@ -649,7 +649,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
           boxShadow: isSelected
               ? <BoxShadow>[
                   BoxShadow(
-                    color: const Color(0xFFF77F00).withOpacity(0.3),
+                    color: const Color(0xFFF77F00).withValues(alpha: 0.3),
                     blurRadius: 8,
                     offset: const Offset(0, 4),
                   ),
@@ -812,7 +812,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
               width: 44,
               height: 44,
               decoration: BoxDecoration(
-                color: Colors.white.withOpacity(0.6),
+                color: Colors.white.withValues(alpha: 0.6),
                 borderRadius: const BorderRadius.all(Radius.circular(10)),
               ),
               child: Icon(
@@ -885,7 +885,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
         border: Border.all(color: AppColors.neutral),
         boxShadow: <BoxShadow>[
           BoxShadow(
-            color: Colors.black.withOpacity(0.04),
+            color: Colors.black.withValues(alpha: 0.04),
             blurRadius: 8,
           ),
         ],
@@ -1048,7 +1048,7 @@ class _SkeletonBoxState extends State<_SkeletonBox>
           width: widget.width,
           height: widget.height,
           decoration: BoxDecoration(
-            color: const Color(0xFFE5E7EB).withOpacity(_animation.value),
+            color: const Color(0xFFE5E7EB).withValues(alpha: _animation.value),
             borderRadius: BorderRadius.circular(widget.radius),
           ),
         );
