@@ -102,6 +102,7 @@ class _QuizScreenState extends State<QuizScreen> {
       _sessionStartTime = _asInt(saved['started_at']) ?? _sessionStartTime;
       _questionDuration =
           _asInt(saved['question_duration']) ?? _questionDuration;
+      _timeLeft = _questionDuration;
       _hasStarted = _questions.isNotEmpty;
       final currentId =
           _questions.isEmpty ? null : _questions[_currentIndex]['id'];
