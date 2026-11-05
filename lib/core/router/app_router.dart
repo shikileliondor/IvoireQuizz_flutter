@@ -181,6 +181,7 @@ final Provider<GoRouter> routerProvider = Provider<GoRouter>((Ref ref) {
           final dynamic extra = state.extra;
           return QuizScreen(
             categoryId: categoryId,
+            categorySlug: state.uri.queryParameters['slug'],
             mode: mode,
             resumeData: extra is Map ? Map<String, dynamic>.from(extra) : null,
           );

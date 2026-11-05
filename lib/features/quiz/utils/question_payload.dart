@@ -33,3 +33,14 @@ int? parseDifficulty(dynamic value) {
   }
   return int.tryParse(text);
 }
+
+/// URL de l'image d'une question (un logo par exemple), ou `null` si elle
+/// n'en a pas ou si l'URL n'est pas une adresse web.
+String? questionImageUrl(Map<String, dynamic> question) {
+  final String url = question['image_url']?.toString().trim() ?? '';
+  final Uri? uri = Uri.tryParse(url);
+  if (uri == null || !(uri.isScheme('http') || uri.isScheme('https'))) {
+    return null;
+  }
+  return url;
+}

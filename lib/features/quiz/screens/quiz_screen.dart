@@ -10,6 +10,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../../core/audio/app_audio_controller.dart';
 import '../../../core/config/api_config.dart';
+import '../utils/logo_mode.dart';
 import '../utils/question_payload.dart';
 import '../utils/score_calculator.dart';
 
@@ -25,6 +26,7 @@ final ValueNotifier<Map<String, dynamic>?> activeQuizDraftNotifier =
 
 class QuizScreen extends StatefulWidget {
   final int? categoryId;
+  final String? categorySlug;
   final String mode;
   final String? challengeCode;
   final Map<String, dynamic>? resumeData;
@@ -34,6 +36,7 @@ class QuizScreen extends StatefulWidget {
   const QuizScreen({
     super.key,
     this.categoryId,
+    this.categorySlug,
     this.challengeCode,
     this.resumeData,
     this.campaignSessionId,
@@ -115,6 +118,7 @@ class _QuizScreenState extends State<QuizScreen> {
       }
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (!mounted || !_hasStarted) return;
+        unawaited(_precacheImages(_questions, _currentIndex));
         if (_answered) {
           Future.delayed(const Duration(seconds: 2), () {
             if (mounted) _nextQuestion();
@@ -194,6 +198,7 @@ class _QuizScreenState extends State<QuizScreen> {
         if (challengeQuestions.isEmpty) {
           throw StateError('Le défi ne contient pas de questions.');
         }
+        await _precacheImages(challengeQuestions, 0);
         if (!mounted) return;
         setState(() {
           _questions = challengeQuestions;
@@ -247,6 +252,8 @@ class _QuizScreenState extends State<QuizScreen> {
       debugPrint('QUESTIONS: ${questions.length}');
 
       if (questions.isNotEmpty) {
+        await _precacheImages(questions, 0);
+        if (!mounted) return;
         setState(() {
           _questions = questions;
           _isLoading = false;
@@ -326,6 +333,8 @@ class _QuizScreenState extends State<QuizScreen> {
       setState(() => _isLoading = false);
       return;
     }
+    await _precacheImages(questions, 0);
+    if (!mounted) return;
     setState(() {
       _questions = questions;
       _offlineGame = true;
@@ -468,6 +477,22 @@ class _QuizScreenState extends State<QuizScreen> {
     if (value is num) return value != 0;
     final normalized = value?.toString().trim().toLowerCase();
     return normalized == 'true' || normalized == '1' || normalized == 'yes';
+  }
+
+  /// Télécharge les images avant de lancer le chrono : celle de la question
+  /// affichée est attendue (5 s au plus), les autres arrivent pendant la partie.
+  Future<void> _precacheImages(
+      List<Map<String, dynamic>> questions, int index) async {
+    if (!mounted) return;
+    Future<void>? current;
+    for (var i = 0; i < questions.length; i++) {
+      final url = questionImageUrl(questions[i]);
+      if (url == null) continue;
+      final loading = precacheImage(NetworkImage(url), context,
+          onError: (_, __) {});
+      if (i == index) current = loading;
+    }
+    await current?.timeout(const Duration(seconds: 5), onTimeout: () {});
   }
 
   void _startTimer() {
@@ -812,6 +837,7 @@ class _QuizScreenState extends State<QuizScreen> {
   Widget _buildStartScreen() {
     final bool isMixed = widget.mode == 'mixed';
     final bool isDaily = widget.mode == 'daily';
+    final bool isLogos = widget.categorySlug == logoCategorySlug;
     return Scaffold(
       backgroundColor: Colors.white,
       body: SafeArea(
@@ -861,7 +887,9 @@ class _QuizScreenState extends State<QuizScreen> {
                       ? Icons.shuffle_rounded
                       : isDaily
                           ? Icons.today_rounded
-                          : Icons.play_arrow_rounded,
+                          : isLogos
+                              ? logoCategoryStyle.icon
+                              : Icons.play_arrow_rounded,
                   color: _orange,
                   size: 44,
                 ),
@@ -872,7 +900,9 @@ class _QuizScreenState extends State<QuizScreen> {
                     ? 'Mode mixte'
                     : isDaily
                         ? 'Questions du jour'
-                        : 'Quiz par catégorie',
+                        : isLogos
+                            ? 'Logos'
+                            : 'Quiz par catégorie',
                 textAlign: TextAlign.center,
                 style: GoogleFonts.nunito(
                   fontSize: 26,
@@ -884,7 +914,9 @@ class _QuizScreenState extends State<QuizScreen> {
               Text(
                 isDaily
                     ? 'Une série commune à tous les joueurs, renouvelée chaque jour.'
-                    : 'Les questions seront téléchargées uniquement quand vous démarrez la partie.',
+                    : isLogos
+                        ? 'Retrouve les entreprises ivoiriennes à partir de leur logo.'
+                        : 'Les questions seront téléchargées uniquement quand vous démarrez la partie.',
                 textAlign: TextAlign.center,
                 style: GoogleFonts.nunito(
                   fontSize: 15,
@@ -892,6 +924,18 @@ class _QuizScreenState extends State<QuizScreen> {
                   color: _textGray,
                 ),
               ),
+              if (isLogos) ...[
+                const SizedBox(height: 12),
+                Text(
+                  logoLegalNotice,
+                  textAlign: TextAlign.center,
+                  style: GoogleFonts.nunito(
+                    fontSize: 12,
+                    height: 1.4,
+                    color: _textGray,
+                  ),
+                ),
+              ],
               const SizedBox(height: 32),
               SizedBox(
                 width: double.infinity,
@@ -1064,6 +1108,7 @@ class _QuizScreenState extends State<QuizScreen> {
     final question = _questions[_currentIndex];
     final questionText =
         '${question['question_text'] ?? question['question'] ?? question['text'] ?? ''}';
+    final imageUrl = questionImageUrl(question);
 
     return LayoutBuilder(
       builder: (context, constraints) {
@@ -1135,6 +1180,10 @@ class _QuizScreenState extends State<QuizScreen> {
                     ),
                   ],
                 ),
+                if (imageUrl != null) ...[
+                  SizedBox(height: isCompact ? 14 : 18),
+                  _buildQuestionImage(imageUrl, isCompact),
+                ],
                 SizedBox(height: isCompact ? 14 : 18),
                 Text(
                   questionText,
@@ -1153,6 +1202,56 @@ class _QuizScreenState extends State<QuizScreen> {
           ),
         );
       },
+    );
+  }
+
+  Widget _buildQuestionImage(String url, bool isCompact) {
+    return Container(
+      height: isCompact ? 120 : 160,
+      width: double.infinity,
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        // Fond blanc fixe : les logos sont dessinés pour un fond clair.
+        color: Colors.white,
+        borderRadius: const BorderRadius.all(Radius.circular(16)),
+        border: Border.all(color: _neutral),
+      ),
+      child: Image.network(
+        url,
+        fit: BoxFit.contain,
+        semanticLabel: 'Image de la question',
+        loadingBuilder: (context, child, progress) => progress == null
+            ? child
+            : const Center(
+                child: SizedBox(
+                  width: 28,
+                  height: 28,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 3,
+                    color: _orange,
+                  ),
+                ),
+              ),
+        errorBuilder: (context, error, stack) => Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            const Icon(
+              Icons.image_not_supported_outlined,
+              color: _textGray,
+              size: 32,
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'Image indisponible',
+              style: GoogleFonts.nunito(
+                fontSize: 14,
+                fontWeight: FontWeight.w700,
+                color: _textGray,
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 

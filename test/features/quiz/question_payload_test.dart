@@ -30,4 +30,23 @@ void main() {
     expect(parseDifficulty('expert'), isNull);
     expect(parseDifficulty(null), isNull);
   });
+
+  test('reads the image URL of a logo question', () {
+    expect(
+      questionImageUrl(<String, dynamic>{
+        'image_url': ' https://api.example.ci/storage/questions/logo.png ',
+      }),
+      'https://api.example.ci/storage/questions/logo.png',
+    );
+  });
+
+  test('ignores missing or non-web image URLs', () {
+    expect(questionImageUrl(<String, dynamic>{}), isNull);
+    expect(questionImageUrl(<String, dynamic>{'image_url': null}), isNull);
+    expect(questionImageUrl(<String, dynamic>{'image_url': ''}), isNull);
+    expect(
+      questionImageUrl(<String, dynamic>{'image_url': 'questions/logo.png'}),
+      isNull,
+    );
+  });
 }

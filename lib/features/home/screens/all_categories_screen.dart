@@ -3,6 +3,7 @@ import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 import '../../../core/theme/app_theme.dart';
+import '../../quiz/utils/logo_mode.dart';
 
 class AllCategoriesScreen extends StatefulWidget {
   const AllCategoriesScreen({
@@ -133,7 +134,9 @@ class _AllCategoriesScreenState extends State<AllCategoriesScreen> {
                               Color bgColor,
                               Color iconColor,
                               IconData icon
-                            }) style = _getCategoryStyle(index);
+                            }) style = isLogoCategory(category)
+                                ? logoCategoryStyle
+                                : _getCategoryStyle(index);
                             final String categoryName =
                                 (category['name'] as String?)
                                             ?.trim()
@@ -147,14 +150,8 @@ class _AllCategoriesScreenState extends State<AllCategoriesScreen> {
                                     0;
 
                             return GestureDetector(
-                              onTap: () {
-                                if (widget.selectedMode == 'mixed') {
-                                  context.push('/quiz/null/mixed');
-                                  return;
-                                }
-                                context.push(
-                                    '/quiz/${category['id']}/${widget.selectedMode}');
-                              },
+                              onTap: () => openQuickLaunchCategory(
+                                  context, category, widget.selectedMode),
                               child: Container(
                                 padding: const EdgeInsets.all(16),
                                 decoration: BoxDecoration(

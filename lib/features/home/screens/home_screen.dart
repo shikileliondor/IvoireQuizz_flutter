@@ -11,6 +11,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../../../core/config/api_config.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../quiz/screens/quiz_screen.dart' show activeQuizDraftNotifier;
+import '../../quiz/utils/logo_mode.dart';
 
 class HomeScreen extends ConsumerStatefulWidget {
   const HomeScreen({super.key});
@@ -91,10 +92,10 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
 
           final rawCategories = data['categories'];
           if (rawCategories is List) {
-            _categories = rawCategories
+            _categories = withLogosFirst(rawCategories
                 .whereType<Map>()
                 .map((e) => Map<String, dynamic>.from(e))
-                .toList();
+                .toList());
           }
 
           final rawSession = data['last_session'];
@@ -151,10 +152,10 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
       setState(() {
         final rawCategories = categoriesData;
         if (rawCategories is List) {
-          _categories = rawCategories
+          _categories = withLogosFirst(rawCategories
               .whereType<Map>()
               .map((e) => Map<String, dynamic>.from(e))
-              .toList();
+              .toList());
         }
 
         final rawUser = userData is Map && userData['user'] is Map
@@ -769,7 +770,9 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
             itemBuilder: (BuildContext context, int index) {
               final Map<String, dynamic> category = previewCategories[index];
               final ({Color bgColor, Color iconColor, IconData icon}) style =
-                  _getCategoryStyle(index);
+                  isLogoCategory(category)
+                      ? logoCategoryStyle
+                      : _getCategoryStyle(index);
 
               return _buildCategoryCard(
                 category: category,
@@ -793,13 +796,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
         (category['questions_count'] as num?)?.toInt() ?? 0;
 
     return GestureDetector(
-      onTap: () {
-        if (_selectedMode == 'mixed') {
-          context.push('/quiz/null/mixed');
-          return;
-        }
-        context.push('/quiz/${category['id']}/$_selectedMode');
-      },
+      onTap: () => openQuickLaunchCategory(context, category, _selectedMode),
       child: Container(
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
